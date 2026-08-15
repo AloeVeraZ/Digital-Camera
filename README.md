@@ -1,10 +1,18 @@
 <div align="center">
 
-# Aloe Camera
+# Aloe Camera · ESP32-S3 Digital Camera
 
-### A custom ESP32-S3 digital camera developed across two hardware versions
+### A custom embedded digital camera developed across two hardware generations with live LVGL viewfinder
 
-[Overview](#overview) · [Version 1](#version-1) · [Version 2](#version-2) · [V2 setup](#v2-setup) · [Repository contents](#repository-contents)
+[![Platform](https://img.shields.io/badge/Platform-ESP32--S3-e7352f?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/)
+[![Firmware](https://img.shields.io/badge/Firmware-Arduino_C%2B%2B-6f42c1?style=flat-square&logo=arduino&logoColor=white)](mainCamera/)
+[![UI Framework](https://img.shields.io/badge/GUI-LVGL_8.4_%2B_TFT__eSPI-00aeef?style=flat-square)](https://lvgl.io/)
+[![Storage](https://img.shields.io/badge/Storage-MicroSD_SD__MMC-22c55e?style=flat-square)](#how-v2-works)
+[![Status](https://img.shields.io/badge/Status-V2_Production-f57c00?style=flat-square)](#overview)
+
+A standalone handheld digital camera featuring real-time ST7789 TFT display streaming, 5-way directional navigation, PSRAM caching, and local SD card image management.
+
+[Project Overview](#overview) | [Hardware Evolution](#version-1-vs-version-2) | [System Architecture](#how-v2-works) | [Arduino Bring-Up](#v2-setup) | [Firmware Source](mainCamera/)
 
 </div>
 
@@ -12,143 +20,95 @@
 
 ## Overview
 
-**Aloe Camera** is a compact digital camera project designed and developed by [Angelo James Demetroulakos](https://angelojamesny.com/). The project went through two versions: an extremely simple screenless camera built around a Seeed Studio XIAO ESP32S3 Sense, followed by a more complete handheld camera built with the Freenove Media Kit for ESP32-S3.
+**Aloe Camera** is a compact, custom embedded digital camera designed and developed by [Angelo James Demetroulakos](https://angelojamesny.com/). The project evolved across two distinct hardware generations: an ultra-minimal screenless prototype using the Seeed Studio XIAO ESP32S3 Sense, and a fully integrated handheld camera built on the Freenove ESP32-S3 Media Kit with a live color LCD viewfinder.
 
-The first version proved that a small ESP32 camera could capture and store photographs. The second version focused on making the camera practical to use by adding a live viewfinder, on-device image playback, removable storage, a custom interface, and visible battery information.
-
-> **Status:** V2 is the current version. Its Arduino source is included in [`mainCamera`](mainCamera/). The original V1 source is no longer available because that prototype and its firmware are outdated.
-
-## Version 1
-
-V1 used the [Seeed Studio XIAO ESP32S3 Sense](https://www.amazon.com/dp/B0C69FFVHH), which combines an ESP32-S3 microcontroller with an OV2640 camera module.
-
-The camera was intentionally minimal:
-
-- a power switch turned the camera on;
-- an LED indicated that the camera was ready;
-- one button captured a photograph;
-- there was no screen or live preview; and
-- the camera created its own Wi-Fi network for accessing stored images from a phone.
-
-### Why V1 was replaced
-
-V1 worked, but the experience was inconvenient. There was no way to see or compose a photograph before taking it. A phone was required to retrieve the files, and every transfer involved joining the Wi-Fi network created by the camera, browsing its storage, and downloading the images manually.
-
-The prototype demonstrated the basic idea, but it depended too heavily on a second device to function as a usable camera.
-
-### V1 images
-
-| Placeholder 1 | Placeholder 2 |
-|:---:|:---:|
-| **V1 image placeholder** | **V1 image placeholder** |
-
-## Version 2
-
-V2 uses the [Freenove Media Kit for ESP32-S3](https://www.amazon.com/dp/B0F9L7SBWX), specifically the compact **FNK0102A version with the 1.14-inch 135 × 240 display**.
-
-The Freenove kit provides the main hardware platform in one package:
-
-- ESP32-S3 processor;
-- camera module;
-- 1.14-inch color display;
-- five-way navigation control;
-- microSD card slot;
-- battery connection and voltage sensing;
-- WS2812 status LED; and
-- onboard speaker and microphone hardware.
-
-Freenove's example code and configuration files were useful for bringing up the hardware, but the finished camera software was rebuilt and customized for this project.
-
-### V2 improvements
-
-- **Live viewfinder:** The display shows what the camera is pointing at before a photograph is taken.
-- **On-device playback:** Saved photographs can be viewed directly on the camera instead of through a phone.
-- **Direct storage:** Images are written to the microSD card and can be removed with the card.
-- **Custom interface:** V2 uses an original menu layout, icons, camera screen, and photo viewer.
-- **Faster operation:** The capture and navigation paths were adjusted to make the interface more responsive.
-- **Higher image quality:** Camera settings were changed from the original examples to improve the saved photographs.
-- **Faster image loading:** The photo viewer uses ESP32-S3 PSRAM to cache image data before it is displayed.
-- **Battery interface:** A custom battery indicator shows percentage and charging state across the main screens.
-- **Controlled startup audio:** The firmware controls the speaker pins during startup so the hardware does not produce an uncontrolled power-on ring. The onboard speaker is available for deliberate startup feedback.
-
-### V2 images
-
-| Placeholder 1 | Placeholder 2 |
-|:---:|:---:|
-| **V2 image placeholder** | **V2 image placeholder** |
-
-| Placeholder 3 | Placeholder 4 |
-|:---:|:---:|
-| **V2 image placeholder** | **V2 image placeholder** |
-
-## How V2 works
-
-The included Arduino sketch coordinates the camera, display, controls, storage, status LED, and battery interface.
-
-1. The ESP32-S3 initializes the camera and the SD_MMC connection.
-2. LVGL and TFT_eSPI draw the custom interface on the 1.14-inch screen.
-3. The five-way switch moves between the menu, camera, and photo viewer.
-4. Captured photographs are written to the camera folder on the microSD card.
-5. The photo viewer loads image data into PSRAM for faster on-device playback.
-6. A persistent, filtered battery estimate is shown throughout the interface.
-
-## V2 setup
-
-The complete Freenove download contains the hardware-specific libraries and configuration files required by the sketch. Use the library ZIP files from its `Libraries` folder rather than replacing them with newer Library Manager versions.
-
-### Required software and libraries
-
-- Arduino IDE
-- ESP32 Arduino core **3.0.7**
-- LVGL **8.4.0** from `lvgl.zip`
-- TFT_eSPI **2.5.43** from `TFT_eSPI.zip`
-- Freenove display profiles from `TFT_eSPI_Setups.zip`
-- Freenove WS2812 library **2.0.0**
-
-The camera, Preferences, filesystem, SD_MMC, and PSRAM APIs are provided by the ESP32 Arduino core. The `ESP32-audioI2S` library included by Freenove is not required by the current V2 sketch.
-
-### Arduino board settings
-
-| Setting | Value |
+| System Parameter | Technical Specification |
 | --- | --- |
-| Board | ESP32S3 Dev Module |
-| CPU frequency | 240 MHz (WiFi) |
-| Flash mode | QIO 80 MHz |
-| Flash size | 16 MB (128 Mb) |
-| Partition scheme | 16M Flash (2MB APP / 12.5MB FATFS) |
-| PSRAM | OPI PSRAM |
+| Main microcontroller | Espressif ESP32-S3 (Dual-core Xtensa LX7 @ 240 MHz, 8 MB Octal PSRAM) |
+| Image sensor | OV2640 2-Megapixel CMOS camera module |
+| User interface | 1.14" ST7789 IPS TFT display (135 × 240 pixels) powered by LVGL 8.4 |
+| Physical navigation | 5-way tactile directional switch (Up, Down, Left, Right, Center Click) |
+| Local storage | Removable MicroSD card via 4-bit high-speed SD_MMC bus |
+| Power & battery | Integrated LiPo battery management with real-time ADC voltage telemetry |
+| Active firmware | Complete 17-module Arduino C++ sketch in [`mainCamera/`](mainCamera/) |
 
-### Select the 1.14-inch display
+> [!NOTE]
+> **Status:** Version 2 represents the active, stable firmware baseline. The complete compilation and upload instructions are documented below.
 
-The Freenove bundle currently enables its 3.5-inch display profile by default. In `TFT_eSPI_Setups/User_Setup_Select.h`, enable the small-screen profile and disable the 3.5-inch profile:
+## Version 1 vs. Version 2
+
+```mermaid
+flowchart LR
+    A["V1 Prototype<br/>Seeed XIAO ESP32S3 Sense"] -->|"Blind capture & Wi-Fi download"| B["Usability Limitations"]
+    B -->|"Redesign around integrated screen"| C["V2 Handheld<br/>Freenove ESP32-S3 Media Kit"]
+    C -->|"Live viewfinder & on-device playback"| D["Turnkey Standalone Camera"]
+```
+
+| Feature / Subsystem | Version 1 (Prototype) | Version 2 (Production Handheld) |
+| --- | --- | --- |
+| Core board | Seeed Studio XIAO ESP32S3 Sense | Freenove ESP32-S3 Media Kit (FNK0102A) |
+| Viewfinder | None (blind capture) | 1.14" Color IPS LCD (135 × 240) live preview |
+| Image retrieval | Local Wi-Fi web server download | Direct MicroSD removal + on-screen playback |
+| Image caching | Direct flash write | PSRAM high-speed frame buffer caching |
+| User interface | Single physical push button + LED | Full LVGL graphical menus, icons, and status bar |
+| Power telemetry | Unmonitored | Filtered ADC battery level and charge state indicator |
+
+## How V2 Works
+
+The firmware in [`mainCamera/`](mainCamera/) orchestrates hardware peripherals through high-performance non-blocking tasks:
+
+1. **Hardware Initialization:** Boots the ESP32-S3, allocates frame buffers in 8 MB PSRAM, and mounts the MicroSD card over 4-bit `SD_MMC`.
+2. **Graphical Rendering:** LVGL 8.4 and TFT_eSPI render responsive menus, status bars, and UI dialogs to the ST7789 panel.
+3. **Capture Pipeline:** Pulls JPEG frames from the OV2640 sensor, renders live preview scaling to the screen, and writes full-resolution captures to `/DCIM/`.
+4. **Playback Engine:** Decodes and scales stored images from MicroSD into PSRAM for fluid gallery browsing.
+5. **Battery Monitor:** Continuously samples battery voltage through a software RC filter to provide a stable charge percentage display.
+
+## V2 Setup & Flashing
+
+### 01 / Prerequisites
+- **Arduino IDE** (v2.0+)
+- **ESP32 Arduino Core:** Version `3.0.7`
+- **Libraries:** LVGL `8.4.0`, TFT_eSPI `2.5.43`, Freenove WS2812 `2.0.0`
+
+### 02 / Board Configuration Settings
+
+| Parameter | Required Arduino IDE Setting |
+| --- | --- |
+| Board | **ESP32S3 Dev Module** |
+| CPU Frequency | **240 MHz (WiFi)** |
+| Flash Mode | **QIO 80 MHz** |
+| Flash Size | **16 MB (128 Mb)** |
+| Partition Scheme | **16M Flash (2MB APP / 12.5MB FATFS)** |
+| PSRAM | **OPI PSRAM** |
+
+### 03 / Display Profile Selection
+
+In `TFT_eSPI_Setups/User_Setup_Select.h`, ensure the 1.14-inch compact display macro is uncommented:
 
 ```cpp
 #define FNK0102A_1P14_135x240_ST7789
 //#define FNK0102B_3P5_320x480_ST7796
 ```
 
-Only one display profile should be enabled. The same `FNK0102A_1P14_135x240_ST7789` macro selects the small-screen paths inside the V2 source.
+### 04 / Upload Procedure
+1. Insert a FAT32-formatted MicroSD card into the slot.
+2. Open [`mainCamera/mainCamera.ino`](mainCamera/mainCamera.ino) in Arduino IDE.
+3. Select your serial COM port, compile, and upload.
 
-### Upload
-
-1. Install the ESP32 core and Freenove library ZIP files.
-2. Correct the display profile as shown above.
-3. Insert a microSD card into the Freenove Media Kit.
-4. Open [`mainCamera/mainCamera.ino`](mainCamera/mainCamera.ino) in Arduino IDE.
-5. Apply the board settings, select the serial port, verify, and upload.
-
-## Repository contents
+## Repository Contents
 
 ```text
 .
-├── mainCamera/         # Complete 17-file Aloe Camera V2 Arduino sketch
+├── mainCamera/         # Complete 17-file Aloe Camera V2 Arduino C++ firmware
 ├── .gitattributes
-├── .gitignore          # Local file exclusions
-└── README.md           # Project history, hardware, setup, and placeholders
+├── .gitignore          # Build artifacts and local exclusions
+└── README.md           # Engineering documentation and bring-up guide
 ```
 
-CAD files and final project photographs can be added when they are ready for release.
+---
 
-## Author
+<div align="center">
 
-Aloe Camera was designed and developed by **Angelo James Demetroulakos**.
+Designed and developed by **[Angelo James Demetroulakos](https://angelojamesny.com/)**
+
+</div>
