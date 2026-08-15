@@ -12,7 +12,8 @@
 
 A standalone handheld digital camera featuring real-time ST7789 TFT display streaming, 5-way directional navigation, PSRAM caching, and local SD card image management.
 
-[Project Overview](#overview) | [Hardware Evolution](#version-1-vs-version-2) | [System Architecture](#how-v2-works) | [Arduino Bring-Up](#v2-setup) | [Firmware Source](mainCamera/)
+<strong>Quick navigation:</strong><br>
+[Project Overview](#overview) | [Hardware Evolution](#version-1-vs-version-2) | [System Architecture](#how-v2-works) | [Arduino Bring-Up](#v2-setup-and-flashing) | [Firmware Source](mainCamera/)
 
 </div>
 
@@ -20,7 +21,7 @@ A standalone handheld digital camera featuring real-time ST7789 TFT display stre
 
 ## Overview
 
-**Aloe Camera** is a compact, custom embedded digital camera designed and developed by [Angelo James Demetroulakos](https://angelojamesny.com/). The project evolved across two distinct hardware generations: an ultra-minimal screenless prototype using the Seeed Studio XIAO ESP32S3 Sense, and a fully integrated handheld camera built on the Freenove ESP32-S3 Media Kit with a live color LCD viewfinder.
+**Aloe Camera** is a compact, custom embedded digital camera developed across two distinct hardware generations: an ultra-minimal screenless prototype using the Seeed Studio XIAO ESP32S3 Sense, and a fully integrated handheld camera built on the Freenove ESP32-S3 Media Kit with a live color LCD viewfinder.
 
 | System Parameter | Technical Specification |
 | --- | --- |
@@ -37,12 +38,17 @@ A standalone handheld digital camera featuring real-time ST7789 TFT display stre
 
 ## Version 1 vs. Version 2
 
-```mermaid
-flowchart LR
-    A["V1 Prototype<br/>Seeed XIAO ESP32S3 Sense"] -->|"Blind capture & Wi-Fi download"| B["Usability Limitations"]
-    B -->|"Redesign around integrated screen"| C["V2 Handheld<br/>Freenove ESP32-S3 Media Kit"]
-    C -->|"Live viewfinder & on-device playback"| D["Turnkey Standalone Camera"]
-```
+<table>
+  <tr>
+    <td align="center"><strong>01 / V1 Prototype</strong><br>Seeed XIAO ESP32S3 Sense</td>
+    <td align="center">&rarr;<br>Blind capture and Wi-Fi download</td>
+    <td align="center"><strong>02 / Usability Review</strong><br>No live viewfinder</td>
+    <td align="center">&rarr;<br>Integrated-screen redesign</td>
+    <td align="center"><strong>03 / V2 Handheld</strong><br>Freenove ESP32-S3 Media Kit</td>
+    <td align="center">&rarr;<br>Live preview and playback</td>
+    <td align="center"><strong>04 / Standalone Camera</strong><br>On-device capture workflow</td>
+  </tr>
+</table>
 
 | Feature / Subsystem | Version 1 (Prototype) | Version 2 (Production Handheld) |
 | --- | --- | --- |
@@ -63,7 +69,7 @@ The firmware in [`mainCamera/`](mainCamera/) orchestrates hardware peripherals t
 4. **Playback Engine:** Decodes and scales stored images from MicroSD into PSRAM for fluid gallery browsing.
 5. **Battery Monitor:** Continuously samples battery voltage through a software RC filter to provide a stable charge percentage display.
 
-## V2 Setup & Flashing
+## V2 Setup and Flashing
 
 ### 01 / Prerequisites
 - **Arduino IDE** (v2.0+)
@@ -104,11 +110,3 @@ In `TFT_eSPI_Setups/User_Setup_Select.h`, ensure the 1.14-inch compact display m
 ├── .gitignore          # Build artifacts and local exclusions
 └── README.md           # Engineering documentation and bring-up guide
 ```
-
----
-
-<div align="center">
-
-Designed and developed by **[Angelo James Demetroulakos](https://angelojamesny.com/)**
-
-</div>
