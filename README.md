@@ -73,8 +73,25 @@ The firmware in [`mainCamera/`](mainCamera/) orchestrates hardware peripherals t
 
 ### 01 / Prerequisites
 - **Arduino IDE** (v2.0+)
-- **ESP32 Arduino Core:** Version `3.0.7`
-- **Libraries:** LVGL `8.4.0`, TFT_eSPI `2.5.43`, Freenove WS2812 `2.0.0`
+- **ESP32 Arduino Core:** Version `3.0.7` (the firmware is also compile-verified with `3.3.11`)
+- **Libraries:** No separate download is required. Known-good copies of LVGL `8.4.0`, TFT_eSPI `2.5.43`, the FNK0102A display setup, and Freenove WS2812 `2.0.0` are committed in [`Freenove-Libraries/`](Freenove-Libraries/).
+
+On Windows, install all bundled libraries into the Arduino sketchbook by
+opening PowerShell in this repository and running:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\install-arduino-libraries.ps1
+```
+
+The installer automatically uses the OneDrive Documents location when it is
+present, preserves existing library folders in a backup directory, and installs
+the exact bundled versions. Restart Arduino IDE afterward. To use a custom
+Arduino sketchbook location, pass `-SketchbookPath "C:\path\to\Arduino"`.
+
+For manual installation, use **Sketch > Include Library > Add .ZIP Library**
+and add every ZIP in [`Freenove-Libraries/`](Freenove-Libraries/) in this order:
+`lvgl.zip`, `TFT_eSPI_Setups.zip`, `TFT_eSPI.zip`, then
+`Freenove_WS2812_Lib_for_ESP32.zip`.
 
 ### 02 / Board Configuration Settings
 
@@ -89,7 +106,9 @@ The firmware in [`mainCamera/`](mainCamera/) orchestrates hardware peripherals t
 
 ### 03 / Display Profile Selection
 
-In `TFT_eSPI_Setups/User_Setup_Select.h`, ensure the 1.14-inch compact display macro is uncommented:
+The bundled setup already selects the 1.14-inch FNK0102A display. If using a
+separately downloaded Freenove setup, ensure only this compact-display macro is
+uncommented in `TFT_eSPI_Setups/User_Setup_Select.h`:
 
 ```cpp
 #define FNK0102A_1P14_135x240_ST7789
