@@ -13,7 +13,7 @@
 A standalone handheld digital camera featuring real-time ST7789 TFT display streaming, 5-way directional navigation, PSRAM caching, and local SD card image management.
 
 <strong>Quick navigation:</strong><br>
-[Project Overview](#overview) | [Project Media](#project-media) | [Hardware Evolution](#version-1-vs-version-2) | [How V2 Works](#how-v2-works) | [Arduino Setup](#v2-setup-and-flashing) | [Firmware Source](mainCamera/)
+[Project Overview](#overview) | [Bill of Materials](#bill-of-materials) | [Known Limitation](#known-limitation-battery-readout) | [Project Media](#project-media) | [Hardware Evolution](#version-1-vs-version-2) | [How V2 Works](#how-v2-works) | [Arduino Setup](#v2-setup-and-flashing) | [Firmware Source](mainCamera/)
 
 </div>
 
@@ -30,11 +30,48 @@ A standalone handheld digital camera featuring real-time ST7789 TFT display stre
 | User interface | 1.14" ST7789 IPS TFT display (135 × 240 pixels) powered by LVGL 8.4 |
 | Physical navigation | 5-way tactile directional switch (Up, Down, Left, Right, Center Click) |
 | Local storage | Removable MicroSD card via 4-bit high-speed SD_MMC bus |
-| Power & battery | Integrated LiPo battery management with real-time ADC voltage telemetry |
+| Power & battery | Integrated LiPo battery management with experimental ADC voltage telemetry |
 | Active firmware | Complete 17-module Arduino C++ sketch in [`CameraCode/`](CameraCode/) |
 
 > [!NOTE]
 > **Status:** Version 2 represents the active, stable firmware baseline. The complete compilation and upload instructions are documented below.
+
+### Known Limitation: Battery Readout
+
+> [!WARNING]
+> The V2 battery percentage is not reliable. When the camera is unplugged, the
+> on-screen readout currently reports approximately **20%**, even when that may
+> not reflect the battery's actual state of charge. Multiple calibration,
+> filtering, persistence, and USB-bias-handling approaches were tested, but a
+> dependable percentage reading was not achieved. Treat the displayed value as
+> experimental rather than an accurate remaining-capacity measurement.
+
+### Enclosure CAD
+
+The complete V2 enclosure is included in two formats:
+
+| Format | File | Best For |
+| --- | --- | --- |
+| **STEP** | [Download `aloe-camera-full-case.step`](CAD/aloe-camera-full-case.step) | Importing into other CAD programs, modifying geometry, or preparing the case for manufacturing |
+| **Autodesk Fusion archive (F3Z)** | [Download `aloe-camera-full-case.f3z`](CAD/aloe-camera-full-case.f3z) | Opening the original case design in Autodesk Fusion |
+
+The CAD files cover the printed enclosure only; a printer and filament are not
+included in the bill of materials below.
+
+## Bill of Materials
+
+The following project-specific parts are required to build one Aloe Camera V2.
+A 3D printer and filament are intentionally excluded.
+
+| Qty. | Part | Purpose | Purchase Link |
+| ---: | --- | --- | --- |
+| 1 | **Freenove ESP32-S3 Media Kit (FNK0102A)** | Main board, OV2640 camera, display, controls, and MicroSD interface | Search for model `FNK0102A` |
+| 1 | **KBT 883545PL 3.7 V 1500 mAh LiPo battery** (2-pin 2.54 mm JST, approximately 45 × 35 × 8.8 mm) | Portable power for the completed camera | [Amazon — B09SV2DF7K](https://www.amazon.com/dp/B09SV2DF7K) |
+
+> [!NOTE]
+> The linked KBT 883545PL is the battery selected for this build. Confirm the
+> connector polarity before plugging it into the board; matching JST connector
+> housings do not always guarantee matching wire polarity.
 
 ## Project Media
 
@@ -100,7 +137,7 @@ The firmware in [`CameraCode/`](CameraCode/) keeps the display, camera, controls
 2. **Graphical Rendering:** LVGL 8.4 and TFT_eSPI render responsive menus, status bars, and UI dialogs to the ST7789 panel.
 3. **Capture Pipeline:** Pulls JPEG frames from the OV2640 sensor, renders live preview scaling to the screen, and writes full-resolution captures to `/DCIM/`.
 4. **Playback Engine:** Decodes and scales stored images from MicroSD into PSRAM for fluid gallery browsing.
-5. **Battery Monitor:** Continuously samples battery voltage through a software RC filter to provide a stable charge percentage display.
+5. **Battery Monitor:** Samples battery voltage through a software RC filter and estimates charge percentage. The unplugged percentage remains unreliable; see the [known limitation](#known-limitation-battery-readout).
 
 ## V2 Setup and Flashing
 
@@ -169,6 +206,7 @@ uncommented in `TFT_eSPI_Setups/User_Setup_Select.h`:
 
 ```text
 .
+├── CAD/                # STEP export and Autodesk Fusion enclosure archive
 ├── docs/images/        # Project photography used by this README
 ├── mainCamera/         # Complete 17-file Aloe Camera V2 Arduino C++ firmware
 ├── Freenove-Libraries/ # Bundled board and display libraries
