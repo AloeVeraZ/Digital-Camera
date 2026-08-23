@@ -93,6 +93,18 @@ and add every ZIP in [`Freenove-Libraries/`](Freenove-Libraries/) in this order:
 `lvgl.zip`, `TFT_eSPI_Setups.zip`, `TFT_eSPI.zip`, then
 `Freenove_WS2812_Lib_for_ESP32.zip`.
 
+The archives came from the official [Freenove ESP32-S3 Media Kit
+repository](https://github.com/Freenove/Freenove_Media_Kit_for_ESP32-S3/tree/main/Libraries).
+The bundled `TFT_eSPI_Setups.zip` differs only by selecting the
+`FNK0102A_1P14_135x240_ST7789` display profile.
+
+| Library archive | Version | SHA-256 |
+| --- | --- | --- |
+| `lvgl.zip` | 8.4.0 | `d687a7cec1466743e9d1b9c7f4f4b033a9121a17d8d5d0ae6461eeb284e84f20` |
+| `TFT_eSPI.zip` | 2.5.43 | `b471fc7af1daecd8b022f8e2ec4ca3da8301564676c9e3b6986e51ff2762787b` |
+| `TFT_eSPI_Setups.zip` | FNK0102A profile | `05aae81c0afc69e1ab3ce5b5d4d30972d0c9343296c413f8866c28b612eb3fc4` |
+| `Freenove_WS2812_Lib_for_ESP32.zip` | 2.0.0 | `9fe4003730d85ef5e9e8f2ed707b57825b62c36e1e1d53409c07feb2c756e7a2` |
+
 ### 02 / Board Configuration Settings
 
 | Parameter | Required Arduino IDE Setting |
