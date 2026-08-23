@@ -1,13 +1,13 @@
 <div align="center">
 
-# Allo Z Mini
+# aloeZ mini mini
 
 [![Platform](https://img.shields.io/badge/Platform-ESP32--S3-e7352f?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/)
 [![Firmware](https://img.shields.io/badge/Firmware-Arduino_C%2B%2B-6f42c1?style=flat-square&logo=arduino&logoColor=white)](mainCamera/)
 [![UI Framework](https://img.shields.io/badge/GUI-LVGL_8.4_%2B_TFT__eSPI-00aeef?style=flat-square)](https://lvgl.io/)
 [![Storage](https://img.shields.io/badge/Storage-MicroSD_SD__MMC-22c55e?style=flat-square)](#how-v2-works)
 
-<img src="docs/images/allo-z-mini-v2.png" alt="Allo Z Mini camera" width="900">
+<img src="docs/images/aloez-mini-mini-v2.png" alt="aloeZ mini mini camera" width="900">
 
 <strong>Quick navigation:</strong><br>
 [Overview](#overview) | [Parts](#bill-of-materials) | [CAD](#cad-files) | [Photos and Videos](#photos-and-videos) | [V1 and V2](#v1-and-v2) | [Setup](#v2-setup-and-flashing) | [Code](mainCamera/)
@@ -18,7 +18,7 @@
 
 ## Overview
 
-Allo Z Mini is a small digital camera I made with an ESP32-S3. I built V1 first
+aloeZ mini mini is a small digital camera I made with an ESP32-S3. I built V1 first
 as a screenless camera, then rebuilt it as V2 with a screen, controls, a battery,
 and MicroSD storage. V2 is the final version and the one used in this repo.
 
@@ -52,8 +52,8 @@ I included the full case in two formats.
 
 | Format | File |
 | --- | --- |
-| STEP | [`allo-z-mini-full-case.step`](CAD/allo-z-mini-full-case.step) |
-| Fusion 360 archive | [`allo-z-mini-full-case.f3z`](CAD/allo-z-mini-full-case.f3z) |
+| STEP | [`aloez-mini-mini-full-case.step`](CAD/aloez-mini-mini-full-case.step) |
+| Fusion 360 archive | [`aloez-mini-mini-full-case.f3z`](CAD/aloez-mini-mini-full-case.f3z) |
 
 Use the STEP file in most CAD programs. Use the F3Z file if you want the Fusion
 360 version.
@@ -61,7 +61,7 @@ Use the STEP file in most CAD programs. Use the F3Z file if you want the Fusion
 ## Photos and Videos
 
 <p align="center">
-  <img src="docs/images/allo-z-mini-v1-v2.png" alt="Allo Z Mini V1 and V2 side by side" width="900">
+  <img src="docs/images/aloez-mini-mini-v1-v2.png" alt="aloeZ mini mini V1 and V2 side by side" width="900">
 </p>
 
 <p align="center"><em>V1 is on the left. V2 is on the right.</em></p>
