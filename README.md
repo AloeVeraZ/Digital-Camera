@@ -13,7 +13,7 @@
 A standalone handheld digital camera featuring real-time ST7789 TFT display streaming, 5-way directional navigation, PSRAM caching, and local SD card image management.
 
 <strong>Quick navigation:</strong><br>
-[Project Overview](#overview) | [Hardware Evolution](#version-1-vs-version-2) | [System Architecture](#how-v2-works) | [Arduino Bring-Up](#v2-setup-and-flashing) | [Firmware Source](mainCamera/)
+[Project Overview](#overview) | [Project Media](#project-media) | [Hardware Evolution](#version-1-vs-version-2) | [System Architecture](#how-v2-works) | [Arduino Bring-Up](#v2-setup-and-flashing) | [Firmware Source](mainCamera/)
 
 </div>
 
@@ -36,7 +36,39 @@ A standalone handheld digital camera featuring real-time ST7789 TFT display stre
 > [!NOTE]
 > **Status:** Version 2 represents the active, stable firmware baseline. The complete compilation and upload instructions are documented below.
 
+## Project Media
+
+<p align="center">
+  <img src="docs/images/aloe-camera-v1-v2.png" alt="Aloe Camera Version 1 and Version 2 hardware side by side" width="900">
+</p>
+
+<p align="center"><em>Aloe Camera V1 (left) and the smaller, screen-equipped V2 (right).</em></p>
+
+| Build | Video Demo | What It Shows |
+| --- | --- | --- |
+| **Version 1** | [Watch the V1 YouTube Short](https://youtube.com/shorts/e1hyfsS4Pfs?si=TT9GlTVhTSVb_hjN) | The original screenless XIAO ESP32S3 Sense prototype. |
+| **Version 2** | [Watch the V2 YouTube Short](https://youtube.com/shorts/tKdeSfX_wso?si=DUUyIVA3gJq0QIom) | The redesigned standalone camera with its integrated display and on-device interface. |
+
+### Version 2 Close-Up
+
+<p align="center">
+  <img src="docs/images/aloe-camera-v2-close-up.png" alt="Front close-up of the Aloe Camera Version 2 showing its color display and physical controls" width="900">
+</p>
+
+<p align="center"><em>V2 running its on-device camera interface, with the color display and physical navigation controls visible.</em></p>
+
 ## Version 1 vs. Version 2
+
+Version 1 established the capture concept with the Seeed Studio XIAO ESP32S3
+Sense, but its screenless workflow required blind framing and Wi-Fi image
+retrieval. See the original prototype in the
+[V1 video demo](https://youtube.com/shorts/e1hyfsS4Pfs?si=TT9GlTVhTSVb_hjN).
+
+Version 2 turns that experiment into a self-contained handheld camera. The
+Freenove ESP32-S3 Media Kit adds a live color viewfinder, physical menu
+navigation, MicroSD storage, image playback, and battery telemetry. See the
+finished interaction in the
+[V2 video demo](https://youtube.com/shorts/tKdeSfX_wso?si=DUUyIVA3gJq0QIom).
 
 <table>
   <tr>
@@ -58,6 +90,7 @@ A standalone handheld digital camera featuring real-time ST7789 TFT display stre
 | Image caching | Direct flash write | PSRAM high-speed frame buffer caching |
 | User interface | Single physical push button + LED | Full LVGL graphical menus, icons, and status bar |
 | Power telemetry | Unmonitored | Filtered ADC battery level and charge state indicator |
+| Video demo | [Watch V1](https://youtube.com/shorts/e1hyfsS4Pfs?si=TT9GlTVhTSVb_hjN) | [Watch V2](https://youtube.com/shorts/tKdeSfX_wso?si=DUUyIVA3gJq0QIom) |
 
 ## How V2 Works
 
@@ -124,7 +157,9 @@ uncommented in `TFT_eSPI_Setups/User_Setup_Select.h`:
 
 ```text
 .
+├── docs/images/        # Project photography used by this README
 ├── mainCamera/         # Complete 17-file Aloe Camera V2 Arduino C++ firmware
+├── Freenove-Libraries/ # Bundled, known-good Arduino library archives
 ├── .gitattributes
 ├── .gitignore          # Build artifacts and local exclusions
 └── README.md           # Engineering documentation and bring-up guide
