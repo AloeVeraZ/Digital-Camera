@@ -5,15 +5,19 @@
 ### A custom embedded digital camera developed across two hardware generations with live LVGL viewfinder
 
 [![Platform](https://img.shields.io/badge/Platform-ESP32--S3-e7352f?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/)
-[![Firmware](https://img.shields.io/badge/Firmware-Arduino_C%2B%2B-6f42c1?style=flat-square&logo=arduino&logoColor=white)](CameraCode/)
+[![Firmware](https://img.shields.io/badge/Firmware-Arduino_C%2B%2B-6f42c1?style=flat-square&logo=arduino&logoColor=white)](mainCamera/)
 [![UI Framework](https://img.shields.io/badge/GUI-LVGL_8.4_%2B_TFT__eSPI-00aeef?style=flat-square)](https://lvgl.io/)
 [![Storage](https://img.shields.io/badge/Storage-MicroSD_SD__MMC-22c55e?style=flat-square)](#how-v2-works)
 [![Status](https://img.shields.io/badge/Status-V2_Production-f57c00?style=flat-square)](#overview)
 
+<img src="docs/images/aloe-camera-v2-close-up.png" alt="Front close-up of the Aloe Camera Version 2 showing its color display and physical controls" width="900">
+
+<em>Aloe Camera V2 running its on-device camera interface.</em>
+
 A standalone handheld digital camera featuring real-time ST7789 TFT display streaming, 5-way directional navigation, PSRAM caching, and local SD card image management.
 
 <strong>Quick navigation:</strong><br>
-[Project Overview](#overview) | [Bill of Materials](#bill-of-materials) | [Known Limitation](#known-limitation-battery-readout) | [Project Media](#project-media) | [Hardware Evolution](#version-1-vs-version-2) | [How V2 Works](#how-v2-works) | [Arduino Setup](#v2-setup-and-flashing) | [Firmware Source](mainCamera/)
+[Project Overview](#overview) | [Bill of Materials](#bill-of-materials) | [Enclosure CAD](#enclosure-cad) | [Project Media](#project-media) | [Known Limitation](#known-limitation-battery-readout) | [Hardware Evolution](#version-1-vs-version-2) | [How V2 Works](#how-v2-works) | [Arduino Setup](#v2-setup-and-flashing) | [Firmware Source](mainCamera/)
 
 </div>
 
@@ -21,32 +25,47 @@ A standalone handheld digital camera featuring real-time ST7789 TFT display stre
 
 ## Overview
 
-**Aloe Camera** is a compact, custom embedded digital camera developed across two distinct hardware generations: an ultra-minimal screenless prototype using the Seeed Studio XIAO ESP32S3 Sense, and a fully integrated handheld camera built on the Freenove ESP32-S3 Media Kit with a live color LCD viewfinder.
+**Aloe Camera** is a custom handheld digital camera developed across two
+hardware generations. V1 proved the capture concept with a screenless Seeed
+XIAO ESP32S3 Sense; V2 uses the Freenove ESP32-S3 Media Kit (FNK0102A) to add a
+live viewfinder, physical navigation, on-device playback, MicroSD storage, and
+battery power. The active Arduino C++ firmware is in [`mainCamera/`](mainCamera/).
 
-| System Parameter | Technical Specification |
-| --- | --- |
-| Main microcontroller | Espressif ESP32-S3 (Dual-core Xtensa LX7 @ 240 MHz, 8 MB Octal PSRAM) |
-| Image sensor | OV2640 2-Megapixel CMOS camera module |
-| User interface | 1.14" ST7789 IPS TFT display (135 × 240 pixels) powered by LVGL 8.4 |
-| Physical navigation | 5-way tactile directional switch (Up, Down, Left, Right, Center Click) |
-| Local storage | Removable MicroSD card via 4-bit high-speed SD_MMC bus |
-| Power & battery | Integrated LiPo battery management with experimental ADC voltage telemetry |
-| Active firmware | Complete 17-module Arduino C++ sketch in [`CameraCode/`](CameraCode/) |
+For board specifications, pin definitions, assembly instructions, and the
+manufacturer's examples, use the [official FNK0102 documentation](https://docs.freenove.com/projects/fnk0102/en/latest/index.html)
+and [Freenove resource repository](https://github.com/Freenove/Freenove_Media_Kit_for_ESP32-S3).
 
 > [!NOTE]
 > **Status:** Version 2 represents the active, stable firmware baseline. The complete compilation and upload instructions are documented below.
 
-### Known Limitation: Battery Readout
+## Bill of Materials
 
-> [!WARNING]
-> The V2 battery percentage is not reliable. When the camera is unplugged, the
-> on-screen readout currently reports approximately **20%**, even when that may
-> not reflect the battery's actual state of charge. Multiple calibration,
-> filtering, persistence, and USB-bias-handling approaches were tested, but a
-> dependable percentage reading was not achieved. Treat the displayed value as
-> experimental rather than an accurate remaining-capacity measurement.
+The following project-specific parts are required to build one Aloe Camera V2.
+A 3D printer and filament are intentionally excluded.
 
-### Enclosure CAD
+| Qty. | Part | Purpose | Purchase Link |
+| ---: | --- | --- | --- |
+| 1 | **Freenove ESP32-S3 Media Kit (FNK0102A, 1.14-inch version)** | Main board, camera, display, controls, and MicroSD interface | [Amazon — B0F9L7SBWX](https://www.amazon.com/dp/B0F9L7SBWX) |
+| 1 | **KBT 883545PL 3.7 V 1500 mAh LiPo battery** (approximately 45 × 35 × 8.8 mm) | Portable power for the completed camera | [Amazon — B09SV2DF7K](https://www.amazon.com/dp/B09SV2DF7K) |
+
+> [!NOTE]
+> **Purchase links may expire.** If either Amazon page stops working, search for
+> the exact model and specifications shown in the table. In particular, the
+> FNK0102A should be the **1.14-inch** Media Kit, and the battery must be a
+> single-cell **3.7 V LiPo** that physically fits the enclosure.
+
+> [!CAUTION]
+> **The linked battery was not wired in the correct pin order for the Media
+> Kit.** For this build, the red and black contacts had to be removed from the
+> plug housing and swapped before the battery was connected. Verify polarity
+> with the board markings and a multimeter: **red must go to battery positive
+> (+), and black must go to negative/GND (-)**. This is the board's dedicated
+> 3.7–4.2 V battery input—not a 5 V or 3.3 V header connection. Never connect a
+> pack with reversed polarity; it can damage the board or create a battery
+> safety hazard. See Freenove's [battery requirements and polarity diagram](https://docs.freenove.com/projects/fnk0102/en/latest/fnk0102/codes/Main/Preface.html#battery-optional)
+> before installation.
+
+## Enclosure CAD
 
 The complete V2 enclosure is included in two formats:
 
@@ -56,22 +75,7 @@ The complete V2 enclosure is included in two formats:
 | **Autodesk Fusion archive (F3Z)** | [Download `aloe-camera-full-case.f3z`](CAD/aloe-camera-full-case.f3z) | Opening the original case design in Autodesk Fusion |
 
 The CAD files cover the printed enclosure only; a printer and filament are not
-included in the bill of materials below.
-
-## Bill of Materials
-
-The following project-specific parts are required to build one Aloe Camera V2.
-A 3D printer and filament are intentionally excluded.
-
-| Qty. | Part | Purpose | Purchase Link |
-| ---: | --- | --- | --- |
-| 1 | **Freenove ESP32-S3 Media Kit (FNK0102A)** | Main board, OV2640 camera, display, controls, and MicroSD interface | Search for model `FNK0102A` |
-| 1 | **KBT 883545PL 3.7 V 1500 mAh LiPo battery** (2-pin 2.54 mm JST, approximately 45 × 35 × 8.8 mm) | Portable power for the completed camera | [Amazon — B09SV2DF7K](https://www.amazon.com/dp/B09SV2DF7K) |
-
-> [!NOTE]
-> The linked KBT 883545PL is the battery selected for this build. Confirm the
-> connector polarity before plugging it into the board; matching JST connector
-> housings do not always guarantee matching wire polarity.
+included in the bill of materials.
 
 ## Project Media
 
@@ -86,13 +90,15 @@ A 3D printer and filament are intentionally excluded.
 | **Version 1** | [Watch the V1 YouTube Short](https://youtube.com/shorts/e1hyfsS4Pfs?si=TT9GlTVhTSVb_hjN) | The original screenless XIAO ESP32S3 Sense prototype. |
 | **Version 2** | [Watch the V2 YouTube Short](https://youtube.com/shorts/tKdeSfX_wso?si=DUUyIVA3gJq0QIom) | The redesigned standalone camera with its integrated display and on-device interface. |
 
-### Version 2 Close-Up
+## Known Limitation: Battery Readout
 
-<p align="center">
-  <img src="docs/images/aloe-camera-v2-close-up.png" alt="Front close-up of the Aloe Camera Version 2 showing its color display and physical controls" width="900">
-</p>
-
-<p align="center"><em>V2 running its on-device camera interface, with the color display and physical navigation controls visible.</em></p>
+> [!WARNING]
+> The V2 battery percentage is not reliable. When the camera is unplugged, the
+> on-screen readout currently reports approximately **20%**, even when that may
+> not reflect the battery's actual state of charge. Multiple calibration,
+> filtering, persistence, and USB-bias-handling approaches were tested, but a
+> dependable percentage reading was not achieved. Treat the displayed value as
+> experimental rather than an accurate remaining-capacity measurement.
 
 ## Version 1 vs. Version 2
 
@@ -131,7 +137,7 @@ finished interaction in the
 
 ## How V2 Works
 
-The firmware in [`CameraCode/`](CameraCode/) keeps the display, camera, controls, battery reading, and SD card work separated into non-blocking tasks:
+The firmware in [`mainCamera/`](mainCamera/) keeps the display, camera, controls, battery reading, and SD card work separated into non-blocking tasks:
 
 1. **Hardware Initialization:** Boots the ESP32-S3, allocates frame buffers in 8 MB PSRAM, and mounts the MicroSD card over 4-bit `SD_MMC`.
 2. **Graphical Rendering:** LVGL 8.4 and TFT_eSPI render responsive menus, status bars, and UI dialogs to the ST7789 panel.
@@ -199,7 +205,7 @@ uncommented in `TFT_eSPI_Setups/User_Setup_Select.h`:
 
 ### 04 / Upload Procedure
 1. Insert a FAT32-formatted MicroSD card into the slot.
-2. Open [`CameraCode/mainCamera.ino`](CameraCode/mainCamera.ino) in Arduino IDE.
+2. Open [`mainCamera/mainCamera.ino`](mainCamera/mainCamera.ino) in Arduino IDE.
 3. Select your serial COM port, compile, and upload.
 
 ## Repository Contents
