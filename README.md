@@ -5,7 +5,7 @@
 ### A custom embedded digital camera developed across two hardware generations with live LVGL viewfinder
 
 [![Platform](https://img.shields.io/badge/Platform-ESP32--S3-e7352f?style=flat-square&logo=espressif&logoColor=white)](https://www.espressif.com/)
-[![Firmware](https://img.shields.io/badge/Firmware-Arduino_C%2B%2B-6f42c1?style=flat-square&logo=arduino&logoColor=white)](mainCamera/)
+[![Firmware](https://img.shields.io/badge/Firmware-Arduino_C%2B%2B-6f42c1?style=flat-square&logo=arduino&logoColor=white)](CameraCode/)
 [![UI Framework](https://img.shields.io/badge/GUI-LVGL_8.4_%2B_TFT__eSPI-00aeef?style=flat-square)](https://lvgl.io/)
 [![Storage](https://img.shields.io/badge/Storage-MicroSD_SD__MMC-22c55e?style=flat-square)](#how-v2-works)
 [![Status](https://img.shields.io/badge/Status-V2_Production-f57c00?style=flat-square)](#overview)
@@ -13,7 +13,7 @@
 A standalone handheld digital camera featuring real-time ST7789 TFT display streaming, 5-way directional navigation, PSRAM caching, and local SD card image management.
 
 <strong>Quick navigation:</strong><br>
-[Project Overview](#overview) | [Project Media](#project-media) | [Hardware Evolution](#version-1-vs-version-2) | [System Architecture](#how-v2-works) | [Arduino Bring-Up](#v2-setup-and-flashing) | [Firmware Source](mainCamera/)
+[Project Overview](#overview) | [Project Media](#project-media) | [Hardware Evolution](#version-1-vs-version-2) | [How V2 Works](#how-v2-works) | [Arduino Setup](#v2-setup-and-flashing) | [Firmware Source](mainCamera/)
 
 </div>
 
@@ -31,7 +31,7 @@ A standalone handheld digital camera featuring real-time ST7789 TFT display stre
 | Physical navigation | 5-way tactile directional switch (Up, Down, Left, Right, Center Click) |
 | Local storage | Removable MicroSD card via 4-bit high-speed SD_MMC bus |
 | Power & battery | Integrated LiPo battery management with real-time ADC voltage telemetry |
-| Active firmware | Complete 17-module Arduino C++ sketch in [`mainCamera/`](mainCamera/) |
+| Active firmware | Complete 17-module Arduino C++ sketch in [`CameraCode/`](CameraCode/) |
 
 > [!NOTE]
 > **Status:** Version 2 represents the active, stable firmware baseline. The complete compilation and upload instructions are documented below.
@@ -94,7 +94,7 @@ finished interaction in the
 
 ## How V2 Works
 
-The firmware in [`mainCamera/`](mainCamera/) orchestrates hardware peripherals through high-performance non-blocking tasks:
+The firmware in [`CameraCode/`](CameraCode/) keeps the display, camera, controls, battery reading, and SD card work separated into non-blocking tasks:
 
 1. **Hardware Initialization:** Boots the ESP32-S3, allocates frame buffers in 8 MB PSRAM, and mounts the MicroSD card over 4-bit `SD_MMC`.
 2. **Graphical Rendering:** LVGL 8.4 and TFT_eSPI render responsive menus, status bars, and UI dialogs to the ST7789 panel.
@@ -126,6 +126,18 @@ and add every ZIP in [`Freenove-Libraries/`](Freenove-Libraries/) in this order:
 `lvgl.zip`, `TFT_eSPI_Setups.zip`, `TFT_eSPI.zip`, then
 `Freenove_WS2812_Lib_for_ESP32.zip`.
 
+The archives came from the official [Freenove ESP32-S3 Media Kit
+repository](https://github.com/Freenove/Freenove_Media_Kit_for_ESP32-S3/tree/main/Libraries).
+The bundled `TFT_eSPI_Setups.zip` differs only by selecting the
+`FNK0102A_1P14_135x240_ST7789` display profile.
+
+| Library archive | Version | SHA-256 |
+| --- | --- | --- |
+| `lvgl.zip` | 8.4.0 | `d687a7cec1466743e9d1b9c7f4f4b033a9121a17d8d5d0ae6461eeb284e84f20` |
+| `TFT_eSPI.zip` | 2.5.43 | `b471fc7af1daecd8b022f8e2ec4ca3da8301564676c9e3b6986e51ff2762787b` |
+| `TFT_eSPI_Setups.zip` | FNK0102A profile | `05aae81c0afc69e1ab3ce5b5d4d30972d0c9343296c413f8866c28b612eb3fc4` |
+| `Freenove_WS2812_Lib_for_ESP32.zip` | 2.0.0 | `9fe4003730d85ef5e9e8f2ed707b57825b62c36e1e1d53409c07feb2c756e7a2` |
+
 ### 02 / Board Configuration Settings
 
 | Parameter | Required Arduino IDE Setting |
@@ -150,7 +162,7 @@ uncommented in `TFT_eSPI_Setups/User_Setup_Select.h`:
 
 ### 04 / Upload Procedure
 1. Insert a FAT32-formatted MicroSD card into the slot.
-2. Open [`mainCamera/mainCamera.ino`](mainCamera/mainCamera.ino) in Arduino IDE.
+2. Open [`CameraCode/mainCamera.ino`](CameraCode/mainCamera.ino) in Arduino IDE.
 3. Select your serial COM port, compile, and upload.
 
 ## Repository Contents
@@ -159,7 +171,8 @@ uncommented in `TFT_eSPI_Setups/User_Setup_Select.h`:
 .
 ├── docs/images/        # Project photography used by this README
 ├── mainCamera/         # Complete 17-file Aloe Camera V2 Arduino C++ firmware
-├── Freenove-Libraries/ # Bundled, known-good Arduino library archives
+├── Freenove-Libraries/ # Bundled board and display libraries
+├── install-arduino-libraries.ps1
 ├── .gitattributes
 ├── .gitignore          # Build artifacts and local exclusions
 └── README.md           # Engineering documentation and bring-up guide
