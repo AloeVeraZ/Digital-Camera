@@ -52,6 +52,7 @@ void my_disp_flush(lv_disp_drv_t *disp, const lv_area_t *area, lv_color_t *color
 void my_keypad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data)
 {
   static uint32_t last_key = 0;
+  static bool one_shot_consumed = false;
   button.key_scan();
   int key_val = button.get_button_key_value();
   int key_state = button.get_button_state();
@@ -81,11 +82,16 @@ void my_keypad_read(lv_indev_drv_t *indev_drv, lv_indev_data_t *data)
   }
   else if (key_state == Button::KEY_STATE_RELEASED)
   {
+    one_shot_consumed = false;
     data->state = LV_INDEV_STATE_REL;
   }
   else
   {
     data->state = LV_INDEV_STATE_REL;
+  }
+  if (data->state == LV_INDEV_STATE_PR && (last_key == 'B' || last_key == 'D')) {
+    if (one_shot_consumed) data->state = LV_INDEV_STATE_REL;
+    one_shot_consumed = true;
   }
   data->key = last_key;
 }

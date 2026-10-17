@@ -2,7 +2,7 @@
 
 void sdmmc_init(uint8_t clkPin, uint8_t cmdPin, uint8_t d0Pin) {
   SD_MMC.setPins(clkPin, cmdPin, d0Pin);
-  if (!SD_MMC.begin("/sdcard", true, true, SDMMC_FREQ_DEFAULT, 5)) {
+  if (!SD_MMC.begin("/sdcard", true, false, SDMMC_FREQ_DEFAULT, 5)) {
     Serial.println("Card Mount Failed");
     return;
   }
@@ -280,46 +280,47 @@ String get_file_name_by_index(const char *dirname, int index) {
   return "";
 }
 
-void write_jpg(const char *path, const uint8_t *buf, size_t size) {
-  write_file(path, buf, size);
+bool write_jpg(const char *path, const uint8_t *buf, size_t size) {
+  File file = SD_MMC.open(path, FILE_WRITE);
+  if (!file) return false;
+  bool ok = file.write(buf, size) == size;
+  file.close();
+  if (!ok) SD_MMC.remove(path);
+  return ok;
 }
 
-void write_bmp(char *path, uint8_t *buf, long size, long height, long width) {
+static void bmp_le32(uint8_t *p, uint32_t value) {
+  for (int i = 0; i < 4; ++i) p[i] = (value >> (8 * i)) & 0xFF;
+}
+
+bool write_bmp(char *path, uint8_t *buf, long size, long height, long width) {
+  if (width <= 0 || height <= 0 || size < width * height * 2) return false;
   File file = SD_MMC.open(path, FILE_WRITE);
-  if (!file) {
-    Serial.println("Failed to open file for writing");
-    return;
+  if (!file) return false;
+  uint32_t row_bytes = width * 2, stride = (row_bytes + 3) & ~uint32_t(3);
+  uint8_t header[70] = {};
+  header[0] = 'B'; header[1] = 'M';
+  bmp_le32(header + 2, 70 + stride * height);
+  bmp_le32(header + 10, 70);
+  bmp_le32(header + 14, 56);
+  bmp_le32(header + 18, width);
+  bmp_le32(header + 22, height);
+  header[26] = 1; header[28] = 16;
+  bmp_le32(header + 30, 3); // BI_BITFIELDS, RGB565
+  bmp_le32(header + 34, stride * height);
+  bmp_le32(header + 54, 0xF800);
+  bmp_le32(header + 58, 0x07E0);
+  bmp_le32(header + 62, 0x001F);
+  bool ok = file.write(header, sizeof(header)) == sizeof(header);
+  const uint8_t padding[3] = {};
+  for (int i = height - 1; ok && i >= 0; --i) {
+    ok = file.write(buf + i * row_bytes, row_bytes) == row_bytes;
+    if (ok && stride > row_bytes)
+      ok = file.write(padding, stride - row_bytes) == stride - row_bytes;
   }
-  uint8_t bmp_info[] = {
-    0x42, 0x4d,                                                                 // BM: BMP signature
-    size & 0xFF, (size >> 8) & 0xFF, (size >> 16) & 0xFF, (size >> 24) & 0xFF,  // File size
-    0x00, 0x00, 0x00, 0x00,                                                     // Reserved: 0
-    0x46, 0x00, 0x00, 0x00,                                                     // Offset to pixel data: 70 bytes
-
-    0x38, 0x00, 0x00, 0x00,                                                             // Header size: 56 bytes
-    width & 0xFF, (width >> 8) & 0xFF, (width >> 16) & 0xFF, (width >> 24) & 0xFF,      // Image width
-    height & 0xFF, (height >> 8) & 0xFF, (height >> 16) & 0xFF, (height >> 24) & 0xFF,  // Image height
-    0x01, 0x00,                                                                         // Planes: 1
-    0x10, 0x00,                                                                         // Bits per pixel: 16-bit (RGB565)
-    0x03, 0x00, 0x00, 0x00,                                                             // Compression: 0 (none)
-    0x02, 0xc2, 0x01, 0x00,                                                             // Image size: 0 (no compression)
-    0x12, 0x0b, 0x00, 0x00,                                                             // X pixels per meter: 2834 pixels/meter
-    0x12, 0x0b, 0x00, 0x00,                                                             // Y pixels per meter: 2834 pixels/meter
-    0x00, 0x00, 0x00, 0x00,                                                             // Colors used: 0 (default)
-    0x00, 0x00, 0x00, 0x00,                                                             // Important colors: 0 (default)
-    0x00, 0xf8, 0x00, 0x00,
-    0xe0, 0x07, 0x00, 0x00,
-    0x1f, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00
-  };
-
-  uint8_t bmp_efo[] = { 0x00, 0x00 };
-  file.write(bmp_info, 70);
-  for (int i = height - 1; i >= 0; i--) {
-    file.write(&buf[i * width * 2], width * 2);
-  }
-  file.write(bmp_efo, 2);
   file.close();
+  if (!ok) SD_MMC.remove(path);
+  return ok;
 }
 
 bool write_wav_header(const char *path, uint32_t data_size) {

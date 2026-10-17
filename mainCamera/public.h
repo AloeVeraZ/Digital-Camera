@@ -18,6 +18,7 @@
 #include "camera_ui.h"
 #include "picture_ui.h"
 #include "battery_status.h"
+#include "ui_theme.h"
 
 #define CAMERA_FOLDER   "/picture"
 #define PICTURE_FOLDER  "/picture"

@@ -8,6 +8,7 @@ typedef struct lvgl_camera
 	lv_obj_t *camera;
 	lv_obj_t *camera_video;
 	lv_obj_t *camera_flash;
+	lv_obj_t *camera_feedback;
 	lv_timer_t *camera_flash_timer;
 	lv_timer_t *camera_preview_timer;
 }lvgl_camera_ui;
@@ -21,6 +22,7 @@ void loopTask_camera(void *pvParameters);    //camera task thread
 void ui_set_photo_show(uint32_t screen_width, uint32_t screen_height);
 
 void camera_init(int state);                  //Camera initialization
+void camera_build_view(lvgl_camera_ui *ui);
 void setup_scr_camera(lvgl_camera_ui *ui);   //Parameter configuration function on the camera screen
 
 #endif

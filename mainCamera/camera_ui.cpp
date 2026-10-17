@@ -1,4 +1,5 @@
 #include "camera_ui.h"
+#include <atomic>
 #include "Freenove_WS2812_Lib_for_ESP32.h" 
 
 // Reference the global LED strip variable initialized in your main sketch
@@ -9,14 +10,17 @@ lvgl_camera_ui guider_camera_ui;  // camera ui structure
 
 camera_fb_t *fb = NULL;              // data structure of camera frame buffer
 TaskHandle_t cameraTaskHandle;       // camera thread task handle
-static int camera_task_flag = 0;     // camera thread running flag
-static int camera_take_a_photo = 0;  // take a photo flag
+static std::atomic<int> camera_task_flag{0};     // camera thread running flag
+static std::atomic<int> camera_take_a_photo{0};  // take a photo flag
+static std::atomic<bool> camera_stop_requested{false};
+static std::atomic<int> capture_result{0};
+static uint32_t feedback_until = 0;
 static int fileCounter = -1;         // initialized from the SD card before first save
 static lv_img_dsc_t preview_images[2];
 static uint8_t *preview_buffers[2] = { NULL, NULL };
 static size_t preview_buffer_size = 0;
-static volatile int preview_ready_index = -1;
-static volatile int preview_displayed_index = -1;
+static std::atomic<int> preview_ready_index{-1};
+static std::atomic<int> preview_displayed_index{-1};
 
 static void initialize_file_counter(void) {
   if (fileCounter >= 0) return;
@@ -46,7 +50,7 @@ static void show_shutter_flash(void) {
   if (guider_camera_ui.camera_flash_timer) {
     lv_timer_del(guider_camera_ui.camera_flash_timer);
   }
-  guider_camera_ui.camera_flash_timer = lv_timer_create(camera_flash_timer_cb, 1200,
+  guider_camera_ui.camera_flash_timer = lv_timer_create(camera_flash_timer_cb, 160,
                                                          guider_camera_ui.camera_flash);
   lv_timer_set_repeat_count(guider_camera_ui.camera_flash_timer, 1);
 }
@@ -62,14 +66,20 @@ typedef struct
 void create_camera_task(uint32_t screen_width, uint32_t screen_height) {
   if (camera_task_flag == 0) {
     camera_task_flag = 1;
+    camera_stop_requested = false;
     camera_task_params_t *params = (camera_task_params_t *)malloc(sizeof(camera_task_params_t));
     if (params == NULL) {
       Serial.println("Failed to allocate memory for camera task parameters");
+      camera_task_flag = 0;
       return;
     }
     params->screen_width = screen_width;
     params->screen_height = screen_height;
-    xTaskCreate(loopTask_camera, "loopTask_camera", 8192, params, 1, &cameraTaskHandle);
+    if (xTaskCreate(loopTask_camera, "loopTask_camera", 8192, params, 1, &cameraTaskHandle) != pdPASS) {
+      free(params);
+      camera_task_flag = 0;
+      capture_result = -1;
+    }
   } else {
     Serial.println("loopTask_camera is running...");
   }
@@ -77,16 +87,11 @@ void create_camera_task(uint32_t screen_width, uint32_t screen_height) {
 
 // Close the camera thread
 void stop_camera_task(void) {
-  if (camera_task_flag == 1) {
-    camera_task_flag = 0;
-    while (1) {
-      if (eTaskGetState(cameraTaskHandle) == eDeleted) {
-        break;
-      }
-      vTaskDelay(10);
-    }
-    Serial.println("loopTask_camera deleted!");
-  }
+  camera_stop_requested = true;
+  // The worker acknowledges shutdown before its handle can be reclaimed.
+  while (camera_task_flag) vTaskDelay(1);
+  camera_take_a_photo = 0;
+  capture_result = 0;
 }
 
 // Rotate and crop the image
@@ -134,6 +139,18 @@ void rotate_and_crop_image(const uint8_t *input, int inputWidth, int inputHeight
 }
 
 static void camera_preview_timer_cb(lv_timer_t *) {
+  int result = capture_result.exchange(0);
+  if (result) {
+    lv_label_set_text(guider_camera_ui.camera_feedback, result > 0 ?
+        "Saved to SD   " LV_SYMBOL_UP " Home" : "Save failed / check SD");
+    lv_obj_center(guider_camera_ui.camera_feedback);
+    feedback_until = millis() + 2000;
+    storage_status_refresh();
+  } else if (feedback_until && static_cast<int32_t>(millis() - feedback_until) >= 0) {
+    lv_label_set_text(guider_camera_ui.camera_feedback, "OK Shutter   " LV_SYMBOL_UP " Home");
+    lv_obj_center(guider_camera_ui.camera_feedback);
+    feedback_until = 0;
+  }
   int ready = preview_ready_index;
   if (ready < 0 || !lv_obj_is_valid(guider_camera_ui.camera_video)) return;
   lv_img_set_src(guider_camera_ui.camera_video, &preview_images[ready]);
@@ -149,7 +166,7 @@ void loopTask_camera(void *pvParameters) {
   uint32_t screen_height = params->screen_height;
   free(params);  
   Serial.println("loopTask_camera start...");
-  while (camera_task_flag) {
+  while (!camera_stop_requested) {
     if (camera_take_a_photo == 0) {
       if (preview_ready_index >= 0) {
         vTaskDelay(1);
@@ -158,14 +175,16 @@ void loopTask_camera(void *pvParameters) {
       camera_fb_t *fb = esp_camera_fb_get();
       if (!fb) {
         Serial.println("Camera capture failed");
-        return;
+        capture_result = -1;
+        break;
       }
       int write_index = preview_displayed_index == 0 ? 1 : 0;
       uint8_t *buffer = preview_buffers[write_index];
       if (!buffer) {
         Serial.println("Camera preview buffer is unavailable");
         esp_camera_fb_return(fb);
-        return;
+        capture_result = -1;
+        break;
       }
 #ifdef FNK0102A_1P14_135x240_ST7789
       rotate_and_crop_image(fb->buf, fb->width, fb->height, buffer, screen_width, screen_height, 90);
@@ -175,10 +194,18 @@ void loopTask_camera(void *pvParameters) {
       esp_camera_fb_return(fb);
       preview_ready_index = write_index;
     } else {
+      if (SD_MMC.cardType() == CARD_NONE) {
+        capture_result = -1;
+        camera_take_a_photo = 0;
+        vTaskDelay(1);
+        continue;
+      }
+      bool saved = false;
       camera_fb_t *fb = esp_camera_fb_get();
       if (!fb) {
         Serial.println("Camera capture failed");
-        return;
+        capture_result = -1;
+        break;
       }
 
       // Shutter confirmation flash (Solid Purple)
@@ -202,14 +229,15 @@ void loopTask_camera(void *pvParameters) {
           strip.setAllLedsColorData(0, 0, 0);
           strip.show();
           esp_camera_fb_return(fb);
-          return;
+          capture_result = -1;
+          break;
         }
 #ifdef FNK0102A_1P14_135x240_ST7789
         rotate_and_crop_image(fb->buf, fb->width, fb->height, buffer, screen_width, screen_height, 90);
 #elif defined FNK0102B_3P5_320x480_ST7796
         rotate_and_crop_image(fb->buf, fb->width, fb->height, buffer, screen_width, screen_height, 0);
 #endif
-        write_bmp(filename, buffer, (screen_height * screen_width * 2), screen_height, screen_width);
+        saved = write_bmp(filename, buffer, (screen_height * screen_width * 2), screen_height, screen_width);
         free(buffer);
       } else if (s->pixformat == PIXFORMAT_JPEG) {
         do {
@@ -218,24 +246,26 @@ void loopTask_camera(void *pvParameters) {
           else break;
         } while (true);
         Serial.printf("%s size is %d\r\n", filename, fb->len);
-        write_jpg(filename, fb->buf, fb->len);
+        saved = write_jpg(filename, fb->buf, fb->len);
       }
       fileCounter++;
 
       strip.setAllLedsColorData(0, 0, 0);
       strip.show();
-      Serial.println("Photo saved successfully, LED turned OFF.");
+      Serial.println(saved ? "Photo saved to SD." : "Photo save failed.");
 
       esp_camera_fb_return(fb);
       camera_take_a_photo = 0;
+      capture_result = saved ? 1 : -1;
     }
   }
-  vTaskDelete(cameraTaskHandle);
+  camera_task_flag = 0;
+  vTaskDelete(nullptr);
 }
 
 // Initialize an lvgl image variable
 void ui_set_photo_show(uint32_t screen_width, uint32_t screen_height) {
-  lv_img_header_t header;
+  lv_img_header_t header = {};
   header.always_zero = 0;
   header.w = screen_width;
   header.h = screen_height;
@@ -269,6 +299,14 @@ static void camera_screen_gesture_event_handler(lv_event_t *event) {
     uint32_t c = lv_event_get_key(event);
     if (c == LV_KEY_ENTER) {
       if (camera_take_a_photo == 0) {
+        if (!camera_task_flag) {
+          lv_label_set_text(guider_camera_ui.camera_feedback, "Camera unavailable");
+          lv_obj_center(guider_camera_ui.camera_feedback);
+          return;
+        }
+        feedback_until = 0;
+        lv_label_set_text(guider_camera_ui.camera_feedback, "Saving to SD...");
+        lv_obj_center(guider_camera_ui.camera_feedback);
         show_shutter_flash();
         camera_take_a_photo = 1;
       }
@@ -286,55 +324,33 @@ static void camera_screen_gesture_event_handler(lv_event_t *event) {
       }
       stop_camera_task();
       Serial.println("Jump to Main Screen!");
-      if (!lv_obj_is_valid(guider_main_ui.main))
-          setup_scr_main(&guider_main_ui);
-      lv_scr_load(guider_main_ui.main);
-      lv_obj_del(guider_camera_ui.camera);
+      lv_obj_t *old = guider_camera_ui.camera;
+      setup_scr_main(&guider_main_ui);
+      guider_camera_ui.camera = nullptr;
+      lv_obj_del(old);
     }
   }
 } 
 
 // Parameter configuration function on the camera screen
 void setup_scr_camera(lvgl_camera_ui *ui) {
-  ui->camera = lv_obj_create(NULL);
-  lv_coord_t screen_width = lv_obj_get_width(ui->camera);    
-  lv_coord_t screen_height = lv_obj_get_height(ui->camera);  
-
-  static lv_style_t bg_style;
-  lv_style_init(&bg_style);
-  lv_style_set_bg_color(&bg_style, lv_color_hex(0xffffff));
-  lv_obj_add_style(ui->camera, &bg_style, LV_PART_MAIN);
-
-  ui->camera_video = lv_img_create(ui->camera);
-  lv_obj_set_pos(ui->camera_video, 0, 0);
-  lv_obj_set_size(ui->camera_video, screen_width, screen_height);
-
-  // A soft 1.2-second LCD shutter confirmation layered over the preview.
-  ui->camera_flash = lv_obj_create(ui->camera);
-  lv_obj_remove_style_all(ui->camera_flash);
-  lv_obj_set_size(ui->camera_flash, screen_width, screen_height);
-  lv_obj_set_pos(ui->camera_flash, 0, 0);
-  lv_obj_set_style_bg_color(ui->camera_flash, lv_color_hex(0xCDD1D6), 0);
-  lv_obj_set_style_bg_opa(ui->camera_flash, LV_OPA_70, 0);
-  lv_obj_clear_flag(ui->camera_flash, LV_OBJ_FLAG_CLICKABLE);
-  lv_obj_add_flag(ui->camera_flash, LV_OBJ_FLAG_HIDDEN);
-  ui->camera_flash_timer = NULL;
-
-  battery_status_attach(ui->camera);
-
-  lv_group_t *group = lv_group_create();
-  lv_group_add_obj(group, ui->camera);
-  lv_indev_set_group(indev_keypad, group);
-
+  camera_build_view(ui);
+  uint32_t screen_width = lv_disp_get_hor_res(nullptr);
+  uint32_t screen_height = lv_disp_get_ver_res(nullptr);
+  ui->camera_flash_timer = nullptr;
+  feedback_until = 0;
+  capture_result = 0;
+  camera_take_a_photo = 0;
+  ui_attach_controls(ui->camera, ui->camera);
   ui_set_photo_show(screen_width, screen_height);
-  ui->camera_preview_timer = lv_timer_create(camera_preview_timer_cb, 30, NULL);
+  ui->camera_preview_timer = lv_timer_create(camera_preview_timer_cb, 30, nullptr);
+  lv_obj_add_event_cb(ui->camera, camera_screen_gesture_event_handler, LV_EVENT_KEY, nullptr);
   create_camera_task(screen_width, screen_height);
-  lv_obj_add_event_cb(ui->camera, camera_screen_gesture_event_handler, LV_EVENT_ALL, NULL);
 }
 
 // Camera initialization function
 void camera_init(int state) {
-  camera_config_t config;
+  camera_config_t config = {};
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
   config.pin_d0 = Y2_GPIO_NUM;

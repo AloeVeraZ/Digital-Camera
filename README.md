@@ -71,13 +71,49 @@ Use the STEP file in most CAD programs. Use the F3Z file if you want the Fusion
 | V1 | [YouTube Short](https://youtube.com/shorts/e1hyfsS4Pfs?si=TT9GlTVhTSVb_hjN) |
 | V2 | [YouTube Short](https://youtube.com/shorts/tKdeSfX_wso?si=DUUyIVA3gJq0QIom) |
 
-## Known Limitation: Battery Readout
+## Battery Readout
 
-> [!WARNING]
-> The battery percentage does not work correctly. When the camera is unplugged,
-> it usually shows around 20 percent even when that is not the real charge. I
-> tried recalibrating it and changing the filtering, but I could not get a
-> reliable reading. Do not use the number as an accurate battery measurement.
+The installed battery is the **KBT 883545PL, 3.7 V, 1500 mAh** listed above.
+The screen now marks its voltage-based charge estimate with `~`, for example
+`~70%`. It samples live voltage without blocking the UI, discards noisy/invalid
+windows, and settles after power changes. It no longer restores old percentages
+or adds charge based on elapsed time. `--%` means unavailable or settling.
+
+This board exposes battery voltage, not a fuel gauge or a software-readable
+charging-status signal. USB charging and camera load change terminal voltage;
+the percentage remains approximate until this particular board and cell are
+measured. See [the circuit research and calibration procedure](docs/battery.md).
+The board's blue LED remains the charging indicator.
+
+## Camera Controls
+
+![Rendered camera UI](docs/images/ui-preview.png)
+
+| Screen | Left / Right | Down | Up | Center / OK |
+| --- | --- | --- | --- | --- |
+| Home | Select SHOOT / PLAYBACK | — | — | Open selection |
+| Viewfinder | — | — | Home | Take a photo |
+| Single photo | Previous / next photo | Square thumbnail grid | Home | — |
+| Thumbnail grid | Previous / next thumbnail; pages automatically | Stay in grid | Open selected photo | Open selected photo |
+
+Playback starts with the newest numbered photo. The grid contains eight square
+thumbnails per page, with a gold selection outline. One Up press opens the
+selected photo; the next Up press exits playback. Holding Up does not skip
+through both levels. Unreadable images show an error; missing and empty cards
+have their own messages.
+
+The top-left SD icon shows **used / total SD filesystem space** on all screens,
+including other files on the card. Small amounts use K (KB) or M (MB); larger
+amounts and total capacity use G (GB). For example, `1.0M/31.3G` means about
+1 MB used out of 31.3 GB. Nonzero usage no longer rounds down to `0.0 GB`.
+Usage refreshes when a screen opens and after a capture completes. A nearly
+full card turns the readout red.
+
+Serial diagnostics at 115200 accept `storage` for exact SD, photo-folder and
+onboard-flash byte counts. `battery start` begins a bounded SD voltage log that
+resumes across power cycles, `battery mark <note>` adds a test-phase note,
+`battery dump` exports it, and `battery stop` disarms it. See
+[the unplugged test procedure](docs/battery.md#recording-an-unplugged-test).
 
 ## V1 and V2
 
@@ -99,9 +135,9 @@ The code is in [`mainCamera/`](mainCamera/).
 
 - LVGL and TFT_eSPI run the menus and screen.
 - The camera feed is scaled down for the live viewfinder.
-- Full photos are saved to `/DCIM/` on the MicroSD card.
+- Photos are saved to `/picture/` on the MicroSD card (currently at viewfinder resolution).
 - Saved photos can be opened from the gallery.
-- The battery icon reads the board's voltage, but the percentage is not accurate.
+- The battery icon shows an approximate live voltage-based charge estimate.
 
 ## V2 Setup and Flashing
 
@@ -161,6 +197,15 @@ uncommented in `TFT_eSPI_Setups/User_Setup_Select.h`:
 //#define FNK0102B_3P5_320x480_ST7796
 ```
 
+### Where the firmware lives
+
+Firmware is uploaded over USB into the ESP32-S3 module's onboard SPI flash.
+The MicroSD card stores photos in `/picture/`; it is not the firmware target.
+This sketch has no SD-card firmware updater. The **Flash Size** and **Partition
+Scheme** settings describe onboard flash, separately from the SD capacity.
+An SD card is needed for taking/saving photos, not for uploading firmware.
+Mount failures never trigger automatic formatting.
+
 ### 04 / Upload Procedure
 1. Insert a FAT32-formatted MicroSD card into the slot.
 2. Open [`mainCamera/mainCamera.ino`](mainCamera/mainCamera.ino) in Arduino IDE.
@@ -179,3 +224,15 @@ uncommented in `TFT_eSPI_Setups/User_Setup_Select.h`:
 ├── .gitignore          # Build artifacts and local exclusions
 └── README.md           # Project information and setup
 ```
+
+## Validation
+
+Compile using the bundled libraries and the board settings above. With Arduino
+CLI the board options are `esp32:esp32:esp32s3:FlashSize=16M,PartitionScheme=fatflash,PSRAM=opi`.
+
+The native LVGL harness in [`tests/`](tests/) renders the actual menu, viewfinder
+chrome, gallery, battery, and storage UI at 240 × 135. It checks photo selection
+across pages, Up/Down transitions, repeated screen teardown, invalid battery
+readings, BMP variants, JPEG thumbnails, and missing/empty SD states. It uses
+synthetic photos in a temporary directory. See [`tests/README.md`](tests/README.md)
+for the command and hardware checks.

@@ -1,4 +1,5 @@
 #include "public.h"
+#include "diagnostics.h"
 
 #define SD_MMC_CMD 38         
 #define SD_MMC_CLK 39         
@@ -25,7 +26,7 @@ static void mute_speaker_hardware(void) {
 void setup() {
   mute_speaker_hardware();
   Serial.begin(115200);
-  while (!Serial) { delay(10); }
+  // Start on battery even when no serial monitor is attached.
   
   // Hardware setups
   pinMode(20, INPUT);  // Battery sense pin used by the Freenove battery example
@@ -49,9 +50,11 @@ void setup() {
 
   // Load the menu screen
   setup_scr_main(&guider_main_ui);
+  diagnostics_init();
 }
 
 void loop() {
-  screen.routine();  
+  screen.routine();
+  diagnostics_poll();
   delay(5);
 }

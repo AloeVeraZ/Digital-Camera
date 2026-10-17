@@ -1,6 +1,6 @@
 #include "main_ui.h"
 
-lvgl_main_ui guider_main_ui;  // main ui structure
+lvgl_main_ui guider_main_ui;
 
 static void make_camera_icon(lv_obj_t *parent) {
   lv_obj_t *body = lv_obj_create(parent);
@@ -55,130 +55,66 @@ static void make_gallery_icon(lv_obj_t *parent) {
   lv_obj_align(mountain, LV_ALIGN_CENTER, 1, 8);
 }
 
-static void main_imgbtn_camera_event_cb(lv_event_t *event) {
+
+static void menu_event(lv_event_t *event) {
   lv_event_code_t code = lv_event_get_code(event);
-  
+  lv_obj_t *target = lv_event_get_target(event);
   if (code == LV_EVENT_KEY) {
     uint32_t key = lv_event_get_key(event);
-    if (key == LV_KEY_LEFT) {
-      lv_group_t *g = (lv_group_t *)lv_obj_get_group(lv_event_get_target(event));
-      if (g) lv_group_focus_prev(g);
-    } 
-    else if (key == LV_KEY_RIGHT) {
-      lv_group_t *g = (lv_group_t *)lv_obj_get_group(lv_event_get_target(event));
-      if (g) lv_group_focus_next(g);
-    }
-  }
-  else if (code == LV_EVENT_RELEASED) {
-    lv_indev_t *indev = lv_indev_get_act();
-    if (indev && lv_indev_get_key(indev) != LV_KEY_ENTER) {
-      return;
-    }
-    
-    Serial.println("Jumping to camera screen!");
-    if (!lv_obj_is_valid(guider_camera_ui.camera))
+    lv_group_t *group = static_cast<lv_group_t *>(lv_obj_get_group(target));
+    if (key == LV_KEY_LEFT) lv_group_focus_prev(group);
+    if (key == LV_KEY_RIGHT) lv_group_focus_next(group);
+  } else if (code == LV_EVENT_RELEASED) {
+    lv_indev_t *input = lv_indev_get_act();
+    if (input && lv_indev_get_key(input) != LV_KEY_ENTER) return;
+    if (target == guider_main_ui.main_imgbtn_camera) {
       setup_scr_camera(&guider_camera_ui);
-    lv_scr_load(guider_camera_ui.camera);
-    
-    uint32_t w = lv_disp_get_hor_res(NULL);
-    uint32_t h = lv_disp_get_ver_res(NULL);
-    create_camera_task(w, h);
-    lv_obj_del(guider_main_ui.main);
-  }
-  else if (code == LV_EVENT_FOCUSED) {
-    lv_obj_scroll_to_view_recursive(lv_event_get_target(event), LV_ANIM_ON);
+      lv_scr_load(guider_camera_ui.camera);
+    } else {
+      setup_scr_picture(&guider_picture_ui);
+      lv_scr_load(guider_picture_ui.picture);
+    }
+    lv_obj_t *old = guider_main_ui.main;
+    guider_main_ui.main = nullptr;
+    lv_obj_del(old);
   }
 }
 
-static void main_imgbtn_picture_event_cb(lv_event_t *event) {
-  lv_event_code_t code = lv_event_get_code(event);
-  
-  if (code == LV_EVENT_KEY) {
-    uint32_t key = lv_event_get_key(event);
-    if (key == LV_KEY_LEFT) {
-      lv_group_t *g = (lv_group_t *)lv_obj_get_group(lv_event_get_target(event));
-      if (g) lv_group_focus_prev(g);
-    } 
-    else if (key == LV_KEY_RIGHT) {
-      lv_group_t *g = (lv_group_t *)lv_obj_get_group(lv_event_get_target(event));
-      if (g) lv_group_focus_next(g);
-    }
-  }
-  else if (code == LV_EVENT_RELEASED) {
-    lv_indev_t *indev = lv_indev_get_act();
-    if (indev && lv_indev_get_key(indev) != LV_KEY_ENTER) {
-      return;
-    }
-    
-    Serial.println("Jumping to picture gallery!");
-    if (!lv_obj_is_valid(guider_picture_ui.picture))
-      setup_scr_picture(&guider_picture_ui);
-    lv_scr_load(guider_picture_ui.picture);
-    lv_obj_del(guider_main_ui.main);
-  }
-  else if (code == LV_EVENT_FOCUSED) {
-    lv_obj_scroll_to_view_recursive(lv_event_get_target(event), LV_ANIM_ON);
-  }
+static lv_obj_t *menu_card(lv_obj_t *parent, int x, int y, int w, int h,
+                           const char *name, bool camera) {
+  lv_obj_t *card = lv_btn_create(parent);
+  lv_obj_remove_style_all(card);
+  lv_obj_set_pos(card, x, y);
+  lv_obj_set_size(card, w, h);
+  lv_obj_set_style_radius(card, 8, 0);
+  lv_obj_set_style_bg_color(card, lv_color_hex(UI_PANEL), 0);
+  lv_obj_set_style_bg_opa(card, LV_OPA_COVER, 0);
+  lv_obj_set_style_border_width(card, 2, LV_STATE_FOCUSED);
+  lv_obj_set_style_border_color(card, lv_color_hex(UI_ACCENT), LV_STATE_FOCUSED);
+  lv_obj_set_style_bg_color(card, lv_color_hex(0x353126), LV_STATE_PRESSED);
+  lv_obj_set_style_outline_width(card, 0, LV_STATE_FOCUSED);
+  lv_obj_clear_flag(card, LV_OBJ_FLAG_SCROLLABLE);
+  lv_obj_t *art = ui_block(card, 0, 0, w, h - 23, UI_PANEL);
+  lv_obj_set_style_bg_opa(art, LV_OPA_TRANSP, 0);
+  if (camera) make_camera_icon(art); else make_gallery_icon(art);
+  lv_obj_t *caption = ui_label(card, name);
+  lv_obj_align(caption, LV_ALIGN_BOTTOM_MID, 0, -5);
+  lv_obj_add_event_cb(card, menu_event, LV_EVENT_ALL, nullptr);
+  return card;
 }
 
 void setup_scr_main(lvgl_main_ui *ui) {
-  ui->main = lv_obj_create(NULL);
-  lv_obj_clear_flag(ui->main, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_bg_color(ui->main, lv_color_hex(0xE4E7EB), 0);
-  
-  ui->main_panel = lv_obj_create(ui->main);
-  lv_obj_set_size(ui->main_panel, lv_disp_get_hor_res(NULL), lv_disp_get_ver_res(NULL));
-  lv_obj_set_flex_flow(ui->main_panel, LV_FLEX_FLOW_ROW);
-  lv_obj_set_flex_align(ui->main_panel, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
-  lv_obj_set_style_pad_column(ui->main_panel, 24, 0);
-  lv_obj_set_style_bg_color(ui->main_panel, lv_color_hex(0xE4E7EB), 0);
-  lv_obj_set_style_bg_opa(ui->main_panel, LV_OPA_COVER, 0);
-  lv_obj_set_style_border_width(ui->main_panel, 0, 0);
-  lv_obj_set_scroll_snap_x(ui->main_panel, LV_SCROLL_SNAP_CENTER);
-  lv_obj_set_scrollbar_mode(ui->main_panel, LV_SCROLLBAR_MODE_OFF);
-  lv_obj_align(ui->main_panel, LV_ALIGN_CENTER, 0, 0);
-
-  static lv_style_t pressed_style;
-  lv_style_init(&pressed_style);
-  lv_style_set_transform_zoom(&pressed_style, 240);
-
-  static lv_style_t focused_style;
-  lv_style_init(&focused_style);
-  lv_style_set_border_width(&focused_style, 3);
-  lv_style_set_border_color(&focused_style, lv_color_hex(0x2563EB));
-  lv_style_set_shadow_width(&focused_style, 12);
-  lv_style_set_shadow_opa(&focused_style, LV_OPA_20);
-
-  // 1. Setup Camera Button
-  ui->main_imgbtn_camera = lv_btn_create(ui->main_panel);
-  lv_obj_set_size(ui->main_imgbtn_camera, 80, 80);
-  lv_obj_set_style_radius(ui->main_imgbtn_camera, 18, 0);
-  lv_obj_set_style_bg_color(ui->main_imgbtn_camera, lv_color_hex(0x27364A), 0);
-  make_camera_icon(ui->main_imgbtn_camera);
-  lv_obj_add_style(ui->main_imgbtn_camera, &pressed_style, LV_STATE_PRESSED | LV_PART_MAIN);
-  lv_obj_add_style(ui->main_imgbtn_camera, &focused_style, LV_STATE_FOCUSED | LV_PART_MAIN);
-  lv_obj_add_event_cb(ui->main_imgbtn_camera, main_imgbtn_camera_event_cb, LV_EVENT_ALL, NULL);
-
-  // 2. Setup Storage/Picture Button
-  ui->main_imgbtn_picture = lv_btn_create(ui->main_panel);
-  lv_obj_set_size(ui->main_imgbtn_picture, 80, 80);
-  lv_obj_set_style_radius(ui->main_imgbtn_picture, 18, 0);
-  lv_obj_set_style_bg_color(ui->main_imgbtn_picture, lv_color_hex(0x4C6B63), 0);
-  make_gallery_icon(ui->main_imgbtn_picture);
-  lv_obj_add_style(ui->main_imgbtn_picture, &pressed_style, LV_STATE_PRESSED | LV_PART_MAIN);
-  lv_obj_add_style(ui->main_imgbtn_picture, &focused_style, LV_STATE_FOCUSED | LV_PART_MAIN);
-  lv_obj_add_event_cb(ui->main_imgbtn_picture, main_imgbtn_picture_event_cb, LV_EVENT_ALL, NULL);
-
-  lv_obj_update_snap(ui->main_panel, LV_ANIM_OFF);
-  lv_obj_scroll_to_view_recursive(ui->main_imgbtn_camera, LV_ANIM_OFF);
-
-  lv_group_t *group = lv_group_create();
-  lv_group_add_obj(group, ui->main_imgbtn_camera);
-  lv_group_add_obj(group, ui->main_imgbtn_picture);
-  lv_group_set_editing(group, false);
-  lv_indev_set_group(indev_keypad, group);
-
-  battery_status_attach(ui->main);
-
+  ui->main = lv_obj_create(nullptr);
+  ui_screen_style(ui->main);
+  const int w = lv_disp_get_hor_res(nullptr), h = lv_disp_get_ver_res(nullptr);
+  ui->main_panel = ui->main;
+  int card_w = (w - 30) / 2;
+  ui->main_imgbtn_camera = menu_card(ui->main, 10, 29, card_w, h - 56,
+                                    "SHOOT", true);
+  ui->main_imgbtn_picture = menu_card(ui->main, 20 + card_w, 29, card_w, h - 56,
+                                     "PLAYBACK", false);
+  ui_status_bar(ui->main);
+  ui_footer(ui->main, "aloeZ mini mini  /  OK Select");
+  ui_attach_controls(ui->main, ui->main_imgbtn_camera, ui->main_imgbtn_picture);
   lv_scr_load(ui->main);
 }

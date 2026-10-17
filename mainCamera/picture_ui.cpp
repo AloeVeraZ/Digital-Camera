@@ -1,275 +1,185 @@
 #include "picture_ui.h"
+#include "photo_image.h"
+#include "gallery_navigation.h"
 #include <algorithm>
 #include <vector>
-#include "esp_heap_caps.h"
 
 lvgl_picture_ui guider_picture_ui;
-static int picture_index = 0;
-static int current_picture_index = -1;
-static int total_pictures = 0;
+static GalleryNavigation nav;
 static std::vector<String> picture_files;
-static char current_picture_path[192];
-
-struct PictureCacheSlot {
-  uint8_t *pixels;
-  size_t capacity;
-  lv_img_dsc_t image;
-  String file_name;
-};
-static PictureCacheSlot picture_cache[2] = {};
-static int next_cache_slot = 0;
-
-static uint32_t read_le32(const uint8_t *bytes) {
-  return (uint32_t)bytes[0] | ((uint32_t)bytes[1] << 8) |
-         ((uint32_t)bytes[2] << 16) | ((uint32_t)bytes[3] << 24);
-}
-
-static bool load_bmp_fast(const char *name, int slot_index) {
-  snprintf(current_picture_path, sizeof(current_picture_path), "%s/%s", PICTURE_FOLDER, name);
-  fs::File file = SD_MMC.open(current_picture_path, FILE_READ);
-  if (!file) return false;
-
-  uint8_t header[70];
-  if (file.read(header, sizeof(header)) != sizeof(header) || header[0] != 'B' ||
-      header[1] != 'M' || header[28] != 16 || header[29] != 0) {
-    file.close();
-    return false;
-  }
-  uint32_t pixel_offset = read_le32(header + 10);
-  uint32_t width = read_le32(header + 18);
-  int32_t signed_height = (int32_t)read_le32(header + 22);
-  bool bottom_up = signed_height > 0;
-  uint32_t height = bottom_up ? signed_height : -signed_height;
-  if (!width || !height || width > 480 || height > 480) {
-    file.close();
-    return false;
-  }
-
-  size_t bytes_needed = width * height * 2;
-  PictureCacheSlot &slot = picture_cache[slot_index];
-  if (slot.capacity < bytes_needed) {
-    if (slot.pixels) free(slot.pixels);
-    slot.pixels = (uint8_t *)heap_caps_malloc(bytes_needed, MALLOC_CAP_SPIRAM | MALLOC_CAP_8BIT);
-    if (!slot.pixels) slot.pixels = (uint8_t *)malloc(bytes_needed);
-    if (!slot.pixels) {
-      slot.capacity = 0;
-      file.close();
-      return false;
-    }
-    slot.capacity = bytes_needed;
-  }
-
-  size_t raw_stride = width * 2;
-  size_t padded_stride = (raw_stride + 3) & ~((size_t)3);
-  size_t available = file.size() > pixel_offset ? file.size() - pixel_offset : 0;
-  size_t source_stride = available >= padded_stride * height ? padded_stride : raw_stride;
-  file.seek(pixel_offset, fs::SeekSet);
-  for (uint32_t source_row = 0; source_row < height; ++source_row) {
-    uint32_t destination_row = bottom_up ? height - 1 - source_row : source_row;
-    if (file.read(slot.pixels + destination_row * raw_stride, raw_stride) != raw_stride) {
-      file.close();
-      return false;
-    }
-    if (source_stride > raw_stride) {
-      file.seek(file.position() + source_stride - raw_stride, fs::SeekSet);
-    }
-  }
-  file.close();
-
-  slot.image.header.always_zero = 0;
-  slot.image.header.w = width;
-  slot.image.header.h = height;
-  slot.image.header.cf = LV_IMG_CF_TRUE_COLOR;
-  slot.image.data_size = bytes_needed;
-  slot.image.data = slot.pixels;
-  slot.file_name = name;
-  return true;
-}
+static PhotoImage full_images[2], thumbnails[GalleryNavigation::page_size];
+static String full_names[2];
+static int next_slot = 0, loaded_index = -1, loaded_page = -1, next_thumb = 0;
+static int tile_size = 40;
+static lv_obj_t *tiles[GalleryNavigation::page_size], *tile_images[GalleryNavigation::page_size];
+static lv_obj_t *tile_errors[GalleryNavigation::page_size];
 
 static int photo_number(const String &name) {
   int number = -1;
   return sscanf(name.c_str(), "photo%d", &number) == 1 ? number : -1;
 }
 
-static bool is_picture_file(const String &name) {
-  String lower = name;
-  lower.toLowerCase();
-  return lower.endsWith(".bmp") || lower.endsWith(".jpg") || lower.endsWith(".jpeg");
-}
-
-static void cache_picture_list(void) {
+static void cache_picture_list() {
   picture_files.clear();
-  std::list<File_Entry> files = list_dir(PICTURE_FOLDER, 0);
-  for (const auto &entry : files) {
-    if (!entry.isDirectory && is_picture_file(entry.name)) picture_files.push_back(entry.name);
+  for (const auto &entry : list_dir(PICTURE_FOLDER, 0)) {
+    String lower = entry.name;
+    lower.toLowerCase();
+    if (!entry.isDirectory && (lower.endsWith(".bmp") || lower.endsWith(".jpg") ||
+                               lower.endsWith(".jpeg"))) picture_files.push_back(entry.name);
   }
-
-  // Newest first. Camera-generated photo numbers provide a stable order even
-  // when FAT directory iteration changes after a reboot.
   std::sort(picture_files.begin(), picture_files.end(), [](const String &a, const String &b) {
-    int a_number = photo_number(a);
-    int b_number = photo_number(b);
-    if (a_number >= 0 && b_number >= 0) return a_number > b_number;
-    if (a_number >= 0) return true;
-    if (b_number >= 0) return false;
+    int an = photo_number(a), bn = photo_number(b);
+    if (an >= 0 && bn >= 0 && an != bn) return an > bn;
+    if ((an >= 0) != (bn >= 0)) return an >= 0;
     return a.compareTo(b) > 0;
   });
-  total_pictures = (int)picture_files.size();
+  nav = GalleryNavigation{};
+  nav.count = picture_files.size();
 }
 
-static void update_navigation_chrome(void) {
-  if (!lv_obj_is_valid(guider_picture_ui.picture_counter)) return;
-  if (total_pictures <= 0) {
-    lv_obj_add_flag(guider_picture_ui.picture_left, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(guider_picture_ui.picture_right, LV_OBJ_FLAG_HIDDEN);
-    lv_obj_add_flag(guider_picture_ui.picture_counter, LV_OBJ_FLAG_HIDDEN);
-    return;
-  }
-
-  lv_obj_clear_flag(guider_picture_ui.picture_left, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_clear_flag(guider_picture_ui.picture_right, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_clear_flag(guider_picture_ui.picture_counter, LV_OBJ_FLAG_HIDDEN);
-  lv_obj_set_style_opa(guider_picture_ui.picture_left,
-                       picture_index > 0 ? LV_OPA_80 : LV_OPA_20, 0);
-  lv_obj_set_style_opa(guider_picture_ui.picture_right,
-                       picture_index < total_pictures - 1 ? LV_OPA_80 : LV_OPA_20, 0);
-  if (picture_index == 0) {
-    lv_label_set_text_fmt(guider_picture_ui.picture_counter, "1 / %d  LATEST", total_pictures);
-  } else {
-    lv_label_set_text_fmt(guider_picture_ui.picture_counter, "%d / %d", picture_index + 1,
-                          total_pictures);
-  }
-  lv_obj_align(guider_picture_ui.picture_counter, LV_ALIGN_BOTTOM_MID, 0, -5);
-}
-
-void picture_timer_event_handler(lv_timer_t *timer) {
-  if (total_pictures > 0 && picture_index >= 0 && picture_index < total_pictures &&
-      picture_index != current_picture_index) {
-    picture_display(picture_files[picture_index].c_str());
-    current_picture_index = picture_index;
-  }
-  update_navigation_chrome();
-  guider_picture_ui.picture_timer = NULL;
-  lv_timer_del(timer);
-}
-
-static void schedule_picture_load(void) {
-  if (!guider_picture_ui.picture_timer) {
-    guider_picture_ui.picture_timer = lv_timer_create(picture_timer_event_handler, 1, NULL);
-    lv_timer_set_repeat_count(guider_picture_ui.picture_timer, 1);
-  }
-}
-
-static void picture_event_handler(lv_event_t *event) {
-  if (lv_event_get_code(event) != LV_EVENT_KEY) return;
-  uint32_t key = lv_event_get_key(event);
-
-  if (key == 'B') {
-    if (guider_picture_ui.picture_timer) {
-      lv_timer_del(guider_picture_ui.picture_timer);
-      guider_picture_ui.picture_timer = NULL;
+static void update_chrome() {
+  auto &ui = guider_picture_ui;
+  if (nav.grid) {
+    lv_obj_add_flag(ui.picture_show, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_clear_flag(ui.grid, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_add_flag(ui.message, LV_OBJ_FLAG_HIDDEN);
+    for (int i = 0; i < GalleryNavigation::page_size; ++i) {
+      lv_obj_set_style_border_color(tiles[i], lv_color_hex(
+          nav.page_start() + i == nav.index ? UI_ACCENT : UI_PANEL), 0);
     }
-    Serial.println("Jump to Main Screen!");
-    if (!lv_obj_is_valid(guider_main_ui.main)) setup_scr_main(&guider_main_ui);
-    lv_scr_load(guider_main_ui.main);
-    lv_obj_del(guider_picture_ui.picture);
-    picture_files.clear();
-    return;
-  }
-
-  // Left moves toward newer photos; right moves toward older photos.
-  if (key == LV_KEY_LEFT && picture_index > 0) {
-    --picture_index;
-    update_navigation_chrome();
-    schedule_picture_load();
-  } else if (key == LV_KEY_RIGHT && picture_index < total_pictures - 1) {
-    ++picture_index;
-    update_navigation_chrome();
-    schedule_picture_load();
-  }
-}
-
-static lv_obj_t *create_arrow(lv_obj_t *parent, const char *symbol, lv_align_t align) {
-  lv_obj_t *arrow = lv_label_create(parent);
-  lv_label_set_text(arrow, symbol);
-  lv_obj_set_size(arrow, 30, 30);
-  lv_obj_set_style_radius(arrow, LV_RADIUS_CIRCLE, 0);
-  lv_obj_set_style_bg_color(arrow, lv_color_hex(0x17202A), 0);
-  lv_obj_set_style_bg_opa(arrow, LV_OPA_70, 0);
-  lv_obj_set_style_text_color(arrow, lv_color_white(), 0);
-  lv_obj_set_style_text_align(arrow, LV_TEXT_ALIGN_CENTER, 0);
-  lv_obj_set_style_pad_top(arrow, 7, 0);
-  lv_obj_align(arrow, align, align == LV_ALIGN_LEFT_MID ? 5 : -5, 0);
-  return arrow;
-}
-
-void setup_scr_picture(lvgl_picture_ui *ui) {
-  ui->picture = lv_obj_create(NULL);
-  lv_coord_t screen_width = lv_disp_get_hor_res(NULL);
-  lv_coord_t screen_height = lv_disp_get_ver_res(NULL);
-  lv_obj_set_size(ui->picture, screen_width, screen_height);
-  lv_obj_clear_flag(ui->picture, LV_OBJ_FLAG_SCROLLABLE);
-  lv_obj_set_style_bg_color(ui->picture, lv_color_hex(0x111820), 0);
-
-  ui->picture_show = lv_img_create(ui->picture);
-  lv_obj_set_size(ui->picture_show, screen_width, screen_height);
-  lv_obj_center(ui->picture_show);
-
-  ui->picture_left = create_arrow(ui->picture, LV_SYMBOL_LEFT, LV_ALIGN_LEFT_MID);
-  ui->picture_right = create_arrow(ui->picture, LV_SYMBOL_RIGHT, LV_ALIGN_RIGHT_MID);
-  ui->picture_counter = lv_label_create(ui->picture);
-  lv_obj_set_style_bg_color(ui->picture_counter, lv_color_hex(0x17202A), 0);
-  lv_obj_set_style_bg_opa(ui->picture_counter, LV_OPA_70, 0);
-  lv_obj_set_style_text_color(ui->picture_counter, lv_color_white(), 0);
-  lv_obj_set_style_pad_hor(ui->picture_counter, 8, 0);
-  lv_obj_set_style_pad_ver(ui->picture_counter, 3, 0);
-  lv_obj_set_style_radius(ui->picture_counter, 8, 0);
-  battery_status_attach(ui->picture);
-
-  lv_group_t *group = lv_group_create();
-  lv_group_add_obj(group, ui->picture);
-  lv_group_set_editing(group, true);
-  lv_indev_set_group(indev_keypad, group);
-  lv_obj_add_event_cb(ui->picture, picture_event_handler, LV_EVENT_KEY, NULL);
-
-  cache_picture_list();
-  picture_index = 0;
-  current_picture_index = -1;
-  ui->picture_timer = NULL;
-  lv_img_cache_invalidate_src(NULL);
-
-  if (total_pictures > 0) {
-    update_navigation_chrome();
-    schedule_picture_load();
+    lv_label_set_text_fmt(ui.picture_counter, "%d/%d   " LV_SYMBOL_UP " Open   OK View",
+                         nav.index + 1, nav.count);
   } else {
-    lv_img_set_src(ui->picture_show, LV_SYMBOL_DUMMY "  No images on the SD card");
-    lv_obj_center(ui->picture_show);
-    update_navigation_chrome();
+    lv_obj_add_flag(ui.grid, LV_OBJ_FLAG_HIDDEN);
+    if (nav.count) {
+      lv_obj_clear_flag(ui.picture_show, LV_OBJ_FLAG_HIDDEN);
+      lv_label_set_text_fmt(ui.picture_counter, "%d/%d   " LV_SYMBOL_DOWN " Grid   " LV_SYMBOL_UP " Home",
+                           nav.index + 1, nav.count);
+    } else lv_label_set_text(ui.picture_counter, LV_SYMBOL_UP " Home to start shooting");
   }
+  lv_obj_center(ui.picture_counter);
 }
 
 void picture_display(const char *name) {
-  if (name && name[0]) {
-    String lower = name;
-    lower.toLowerCase();
-    if (lower.endsWith(".bmp")) {
-      for (int i = 0; i < 2; ++i) {
-        if (picture_cache[i].pixels && picture_cache[i].file_name == name) {
-          lv_img_set_src(guider_picture_ui.picture_show, &picture_cache[i].image);
-          return;
-        }
-      }
-      int slot = next_cache_slot;
-      next_cache_slot = (next_cache_slot + 1) % 2;
-      if (load_bmp_fast(name, slot)) {
-        lv_img_set_src(guider_picture_ui.picture_show, &picture_cache[slot].image);
-        return;
-      }
+  auto &ui = guider_picture_ui;
+  lv_obj_add_flag(ui.message, LV_OBJ_FLAG_HIDDEN);
+  int slot = -1;
+  for (int i = 0; i < 2; ++i)
+    if (full_names[i] == name && full_images[i].pixels) slot = i;
+  if (slot < 0) {
+    slot = next_slot;
+    next_slot = 1 - next_slot;
+    // Never overwrite the buffer currently being displayed.
+    lv_img_set_src(ui.picture_show, nullptr);
+    full_names[slot] = "";
+    String path = String(PICTURE_FOLDER) + "/" + name;
+    if (!photo_image_load(path.c_str(), full_images[slot], lv_disp_get_hor_res(nullptr),
+                           lv_disp_get_ver_res(nullptr), false)) {
+      lv_label_set_text(ui.message, "Cannot open photo");
+      lv_obj_clear_flag(ui.message, LV_OBJ_FLAG_HIDDEN);
+      return;
     }
-    snprintf(current_picture_path, sizeof(current_picture_path), "S:%s/%s", PICTURE_FOLDER, name);
-    // The path buffer is persistent; LVGL keeps this pointer after lv_img_set_src returns.
-    lv_img_set_src(guider_picture_ui.picture_show, current_picture_path);
-  } else {
-    lv_img_set_src(guider_picture_ui.picture_show, LV_SYMBOL_DUMMY "  No images on the SD card");
+    full_names[slot] = name;
   }
+  lv_img_set_src(ui.picture_show, &full_images[slot].image);
+  lv_obj_center(ui.picture_show);
+}
+
+static void prepare_grid_page() {
+  loaded_page = nav.page_start();
+  next_thumb = 0;
+  for (int i = 0; i < GalleryNavigation::page_size; ++i) {
+    lv_img_set_src(tile_images[i], nullptr);
+    lv_obj_add_flag(tile_errors[i], LV_OBJ_FLAG_HIDDEN);
+    if (loaded_page + i < nav.count) lv_obj_clear_flag(tiles[i], LV_OBJ_FLAG_HIDDEN);
+    else lv_obj_add_flag(tiles[i], LV_OBJ_FLAG_HIDDEN);
+  }
+}
+
+// Load one thumbnail per timer tick so button handling keeps running between files.
+static void picture_tick(lv_timer_t *) {
+  if (!nav.grid) {
+    if (nav.count && loaded_index != nav.index) {
+      picture_display(picture_files[nav.index].c_str());
+      loaded_index = nav.index;
+    }
+    return;
+  }
+  if (loaded_page != nav.page_start()) prepare_grid_page();
+  if (next_thumb >= GalleryNavigation::page_size || loaded_page + next_thumb >= nav.count) return;
+  int slot = next_thumb++;
+  String path = String(PICTURE_FOLDER) + "/" + picture_files[loaded_page + slot];
+  if (photo_image_load(path.c_str(), thumbnails[slot], tile_size - 4, tile_size - 4, true)) {
+    lv_img_set_src(tile_images[slot], &thumbnails[slot].image);
+    lv_obj_center(tile_images[slot]);
+  } else lv_obj_clear_flag(tile_errors[slot], LV_OBJ_FLAG_HIDDEN);
+}
+
+static void gallery_deleted(lv_event_t *) {
+  auto &ui = guider_picture_ui;
+  if (ui.picture_timer) lv_timer_del(ui.picture_timer);
+  ui.picture_timer = nullptr;
+  // Parent DELETE fires before child deletion: detach every image before freeing.
+  lv_img_set_src(ui.picture_show, nullptr);
+  for (int i = 0; i < GalleryNavigation::page_size; ++i) {
+    lv_img_set_src(tile_images[i], nullptr);
+    photo_image_free(thumbnails[i]);
+  }
+  for (int i = 0; i < 2; ++i) { photo_image_free(full_images[i]); full_names[i] = ""; }
+  picture_files.clear();
+  ui.picture = nullptr;
+}
+
+static void picture_event(lv_event_t *event) {
+  uint32_t key = lv_event_get_key(event);
+  bool was_grid = nav.grid;
+  if (key == 'B' && nav.up_exits()) {
+    lv_obj_t *old = guider_picture_ui.picture;
+    setup_scr_main(&guider_main_ui);
+    lv_obj_del(old);
+    return;
+  }
+  if (key == 'D') nav.down();
+  if (key == LV_KEY_ENTER && nav.grid) nav.grid = false;
+  if (key == LV_KEY_LEFT) nav.move(-1);
+  if (key == LV_KEY_RIGHT) nav.move(1);
+  if (was_grid && !nav.grid) loaded_index = -1;
+  if (!was_grid && nav.grid && loaded_page != nav.page_start()) prepare_grid_page();
+  update_chrome();
+}
+
+void setup_scr_picture(lvgl_picture_ui *ui) {
+  ui->picture = lv_obj_create(nullptr);
+  ui_screen_style(ui->picture);
+  int w = lv_disp_get_hor_res(nullptr), h = lv_disp_get_ver_res(nullptr);
+  ui->picture_show = lv_img_create(ui->picture);
+  ui->message = ui_label(ui->picture, "Loading photos...", UI_MUTED);
+  lv_obj_center(ui->message);
+  ui->grid = ui_block(ui->picture, 0, 24, w, h - 45, UI_BG);
+  tile_size = std::min((w - 30) / 4, (h - 49) / 2);
+  int start_x = (w - (tile_size * 4 + 12)) / 2;
+  int start_y = (h - 45 - (tile_size * 2 + 4)) / 2;
+  for (int i = 0; i < GalleryNavigation::page_size; ++i) {
+    tiles[i] = ui_block(ui->grid, start_x + (i % 4) * (tile_size + 4),
+                        start_y + (i / 4) * (tile_size + 4), tile_size, tile_size, UI_PANEL);
+    lv_obj_set_style_border_width(tiles[i], 2, 0);
+    lv_obj_set_style_radius(tiles[i], 3, 0);
+    tile_images[i] = lv_img_create(tiles[i]);
+    tile_errors[i] = ui_label(tiles[i], LV_SYMBOL_WARNING, UI_MUTED);
+    lv_obj_center(tile_errors[i]);
+    lv_obj_add_flag(tile_errors[i], LV_OBJ_FLAG_HIDDEN);
+  }
+  ui_status_bar(ui->picture);
+  ui->picture_counter = ui_footer(ui->picture, "");
+  ui_attach_controls(ui->picture, ui->picture);
+  lv_obj_add_event_cb(ui->picture, picture_event, LV_EVENT_KEY, nullptr);
+  lv_obj_add_event_cb(ui->picture, gallery_deleted, LV_EVENT_DELETE, nullptr);
+  cache_picture_list();
+  loaded_index = loaded_page = -1;
+  next_slot = 0;
+  if (!nav.count) {
+    lv_label_set_text(ui->message, SD_MMC.cardType() == CARD_NONE ? "Insert an SD card" : "No photos yet");
+  } else lv_obj_add_flag(ui->message, LV_OBJ_FLAG_HIDDEN);
+  update_chrome();
+  ui->picture_timer = lv_timer_create(picture_tick, 20, nullptr);
 }

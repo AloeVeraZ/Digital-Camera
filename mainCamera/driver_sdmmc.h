@@ -28,8 +28,8 @@ void test_file_io(const char * path);
 int read_file_num(const char * dirname);
 void print_file_list(const std::list<File_Entry>& fileList);
 String get_file_name_by_index(const char * dirname, int index);
-void write_jpg(const char * path, const uint8_t *buf, size_t size);
-void write_bmp(char *path, uint8_t *buf, long size, long height, long width);
+bool write_jpg(const char * path, const uint8_t *buf, size_t size);
+bool write_bmp(char *path, uint8_t *buf, long size, long height, long width);
 
 bool write_wav_header(const char * path, uint32_t data_size);
 

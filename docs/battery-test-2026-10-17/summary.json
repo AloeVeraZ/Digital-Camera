@@ -1,0 +1,65 @@
+{
+  "firmware_sha256": "c8b068d281ef3bb69947c864b04d68b056eda271f46109ce019fab30ebb53bf0",
+  "serial_port": "COM12",
+  "sd_total_bytes": 31255953408,
+  "sd_used_before_test_bytes": 1703936,
+  "photo_count": 25,
+  "photo_logical_bytes": 1621800,
+  "esp_flash_bytes": 16777216,
+  "sketch_bytes": 740000,
+  "usb_samples": 35,
+  "usb_cell_median_mv": 4162,
+  "usb_cell_min_mv": 4157,
+  "usb_cell_max_mv": 4172,
+  "charging_led": "User reports blue blinking with battery power ON",
+  "unplugged_test": "completed",
+  "test_csv_on_sd": "/battery-test.csv",
+  "recording": "stopped; /battery-test.enabled removed by battery stop",
+  "sd_used_after_test_bytes": 1736704,
+  "phases": [
+    {
+      "phase": "USB baseline",
+      "samples": 23,
+      "median_mv": 4165,
+      "min_mv": 4160,
+      "max_mv": 4172,
+      "sample_span_s": 110.857,
+      "percent_min": 96,
+      "percent_max": 96
+    },
+    {
+      "phase": "Battery / Home",
+      "samples": 35,
+      "median_mv": 3757,
+      "min_mv": 3755,
+      "max_mv": 3762,
+      "sample_span_s": 170.807,
+      "percent_min": 40,
+      "percent_max": 42
+    },
+    {
+      "phase": "Battery / viewfinder",
+      "samples": 8,
+      "median_mv": 3753.5,
+      "min_mv": 3750,
+      "max_mv": 3757,
+      "sample_span_s": 35.333,
+      "percent_min": 40,
+      "percent_max": 40
+    },
+    {
+      "phase": "USB reconnected",
+      "samples": 5,
+      "median_mv": 3987,
+      "min_mv": 3985,
+      "max_mv": 4002,
+      "sample_span_s": 20.036,
+      "percent_min": 77,
+      "percent_max": 79
+    }
+  ],
+  "raw_rows": 73,
+  "logger_shutdown_ack": "BATTERY TEST stopped. Log retained at /battery-test.csv",
+  "photo_count_after_test": 25,
+  "photo_logical_bytes_after_test": 1621800
+}
