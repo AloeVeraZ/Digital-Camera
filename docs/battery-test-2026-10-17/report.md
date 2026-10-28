@@ -1,10 +1,12 @@
-# Battery and storage test - October 17, 2026
+# Battery and storage test — October 17, 2026
+
+[← Battery guide](../battery.md) · [Documentation](../README.md)
 
 Diagnostic firmware was installed and verified on the ESP32-S3 camera via
 COM12. A bounded CSV recorder on the SD card preserved measurements across
 USB removal, battery power-on, viewfinder use and USB reconnection. There are
 73 recorded samples plus test markers. Recording has been stopped; the CSV is
-retained on SD and exported here as [readings.csv](readings.csv).
+retained on SD. Download [raw readings](readings.csv) or [phase statistics](summary.json).
 
 ## Measured behavior
 
@@ -15,9 +17,9 @@ the firmware's generic voltage estimate, not measured remaining charge.
 
 | Phase | Samples | Span between first/last sample | Median reported voltage | Range | Display estimate |
 | --- | ---: | ---: | ---: | --- | --- |
-| USB baseline | 23 | 110.9 s | 4.1650 V | 4.160-4.172 V | 96-96% |
+| USB baseline | 23 | 110.9 s | 4.1650 V | 4.160-4.172 V | 96% |
 | Battery / Home | 35 | 170.8 s | 3.7570 V | 3.755-3.762 V | 40-42% |
-| Battery / viewfinder | 8 | 35.3 s | 3.7535 V | 3.750-3.757 V | 40-40% |
+| Battery / viewfinder | 8 | 35.3 s | 3.7535 V | 3.750-3.757 V | 40% |
 | USB reconnected | 5 | 20.0 s | 3.9870 V | 3.985-4.002 V | 77-79% |
 
 The battery/Home phase stayed within 7 mV over about 171 seconds, from 3.760 V
@@ -96,8 +98,3 @@ reports and persistent bounded logger start/resume/export/stop behavior.
 The uploaded binary's data hash was verified by esptool. Hardware serial
 commands confirmed logger resume after battery boot, successful CSV export,
 explicit stop, and the same 25 photo files afterward.
-
-A recovery image of flash addresses 0x000000-0x20FFFF was saved before the
-diagnostic upload under `%LOCALAPPDATA%/Digital-Camera/firmware-backups/` as
-`before-battery-test-2026-10-17.bin`. Raw serial transcripts and the exported
-CSV are also retained in `%LOCALAPPDATA%/Digital-Camera/battery-tests/`.

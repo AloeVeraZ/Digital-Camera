@@ -1,157 +1,108 @@
-# Battery measurement research
+# Battery and diagnostics
 
-The bill of materials identifies a **KBT 883545PL, single-cell 3.7 V,
-1500 mAh LiPo**. Capacity affects runtime; it does not determine voltage-based
-charge percentage. No verified discharge curve for this specific KBT cell is
-included in the project or board documentation. The firmware curve is an
-approximation, not a measured KBT calibration.
+[← Project](../README.md) · [Documentation](README.md)
 
-## Hardware evidence
+The camera uses a **KBT 883545PL, 3.7 V / 1500 mAh LiPo**. Its readout is a
+live voltage-based estimate, marked `~`. It is not a calibrated measurement
+of remaining capacity. `--%` means the reading is unavailable or settling.
 
-The [official FNK0102A media-board schematic](https://github.com/Freenove/Freenove_Media_Kit_for_ESP32-S3/blob/main/Schematic_diagram/SCH_for_Media_Board_1.14inch.pdf)
-shows GPIO20 connected through R16 (10 kohm) to BAT-B, R12 (10 kohm) to 3V3,
-and R17 (20 kohm) to ground. GPIO20 also drives LCD reset through R6.
-It must return to high impedance after the boot reset pulse.
+The [October 17 test](battery-test-2026-10-17/report.md) recorded stable readings
+near **3.76 V on battery**, compared with **4.17 V on the first USB baseline**.
+The power-dependent jump needs electrical measurements to isolate its cause;
+it does not show that the battery instantly lost that much charge.
 
-[Freenove's voltage tutorial](https://docs.freenove.com/projects/fnk0102/en/latest/fnk0102/codes/Main/2_Battery_Voltage_Detection.html)
-derives `Vcell_mV = 2.5 * Vadc_mV - 3300`. This is a biased divider, not a
-plain divide-by-two circuit. The offset assumes a 3.300 V rail. The tutorial
-also documents USB powering the board while charging the cell, and the blue
-LED blinking while charging, steady when full, and blinking with no battery.
+## How the readout works
 
-The schematic routes the PMIC LED to board indicators, without an MCU charger
-status input. The firmware has no reliable charging-current, VBUS, or fuel-gauge
-measurement. Rising voltage is not proof of charging: camera load changes and
-ADC noise also move voltage. The software therefore does not invent a charging
-animation.
+- Samples calibrated ADC voltage every 50 ms without blocking the UI.
+- Uses a trimmed 21-sample window to reject spikes.
+- Shows `--%` after three invalid/noisy windows. Steps over 100 mV trigger
+  settling until three seconds of stable readings.
+- Uses live readings, with no saved percentage or timed charge increases.
+- Logs ADC, derived cell and filtered voltages at 115200 baud.
 
-[Espressif's analogReadMilliVolts documentation](https://docs.espressif.com/projects/arduino-esp32/en/latest/api/adc.html)
-describes a calibrated ADC voltage. This does not remove resistor tolerance,
-rail error, or wiring/load effects. The divider amplifies ADC error by 2.5.
-[Espressif's ADC FAQ](https://github.com/espressif/esp-faq/blob/master/docs/en/software-framework/peripherals/adc.rst)
-also documents limitations near the upper ADC range.
+The board has no dedicated software-readable VBUS, charger-status or current
+input in this firmware. Charging is handled by hardware. The blue LED is the
+board's indicator: Freenove documents blinking during charging **or with no
+battery**, and steady when full. The firmware does not infer charging from
+small voltage changes.
 
-## Why 97% could become 16%
+## Circuit and limitations
 
-The old code restored percentage from Preferences, inferred charging from a
-voltage rise as small as 3 mV, added 1% every three minutes without measuring
-charge, then recalculated on a detected unplug edge. Its curve mapped 3.72 V
-to 16%. Both a stale/inflated saved estimate and an actual voltage change could
-produce the reported jump. **Which contribution dominates on this physical
-camera requires measurements; it has not been established.**
+The [FNK0102A schematic](https://github.com/Freenove/Freenove_Media_Kit_for_ESP32-S3/blob/main/Schematic_diagram/SCH_for_Media_Board_1.14inch.pdf)
+connects GPIO20 through R16 (10 kΩ) to BAT-B, R12 (10 kΩ) to 3V3, and R17
+(20 kΩ) to ground. GPIO20 also resets the LCD through R6, so it returns to
+high impedance after the reset pulse.
 
-Charging voltage differs from voltage under camera load at the same charge.
-[TI's SOC estimation application note](https://www.ti.com/lit/an/sluaaa1/sluaaa1.pdf)
-describes deriving a voltage/SOC curve under the application's discharge load.
-Voltage-only estimation cannot deliver fuel-gauge accuracy in both conditions.
+[Freenove's tutorial](https://docs.freenove.com/projects/fnk0102/en/latest/fnk0102/codes/Main/2_Battery_Voltage_Detection.html)
+gives the divider equation:
 
-## Firmware changes
+```text
+Vcell_mV = 2.5 × Vadc_mV − 3300
+```
 
-- One calibrated sample every 50 ms; a trimmed 21-sample window rejects spikes
-  without sleeping in the LVGL loop.
-- Live readings only: no stored percentage, invented initial 50%, timed charge
-  increases, or inferred charger status.
-- Invalid/noisy readings become `--%` after three windows. A step over 100 mV
-  temporarily shows `--%` and requires three seconds of settled readings.
-- `~` identifies an approximate charge estimate. Serial output at 115200 reports
-  ADC, cell and filtered voltages, estimate, and settling. Valid low readings
-  reach 0%; they are not discarded.
-- Reference, gain and offset are configurable in `mainCamera/battery_math.h`.
-  Defaults follow the documented circuit, without invented calibration values.
+This assumes a 3.300 V reference rail. ADC calibration does not remove rail
+error, resistor tolerance or load effects; the divider multiplies ADC error
+by 2.5. See [Espressif's ADC API](https://docs.espressif.com/projects/arduino-esp32/en/latest/api/adc.html)
+and [ADC limitations](https://github.com/espressif/esp-faq/blob/master/docs/en/software-framework/peripherals/adc.rst).
 
-## Calibrating this camera
+The connector is on BAT-A, with Q2 between BAT-A and the sensed BAT-B node.
+A switched/disconnected battery and a USB-driven charger-side node can
+therefore differ from actual cell voltage. This is a possible explanation,
+not an isolated cause established by the test.
 
-1. Upload the firmware and open the board's **USB UART** serial connection at
-   115200. GPIO19/20 are already used by buttons/battery, so use the UART port.
-2. Record serial `ADC=`, `cell=`, and `filtered=` alongside multimeter readings
-   across the battery connector and 3V3/GND, with USB connected.
-3. Measure battery-only voltage under normal viewfinder load. For battery-only
-   serial logging, connect a UART adapter to GND and the board's TX pin, with
-   **no adapter power connection**. A charging USB cable changes the condition.
-4. If 3V3 differs, set `BATTERY_REFERENCE_MV` to its measured value. If two
-   measured points still show systematic error, let `x1,x2` be voltages from the
-   uncorrected divider and `y1,y2` the multimeter readings. Set
-   `BATTERY_GAIN_PPM = round(1000000*(y2-y1)/(x2-x1))` and
-   `BATTERY_OFFSET_MV = round(y1-x1*BATTERY_GAIN_PPM/1000000)`.
-   Do not fit corrections to the old on-screen percentages.
-5. Rebuild and compare at both points. A measured discharge/runtime profile is
-   needed to calibrate the percentage curve. A current-aware fuel gauge would
-   be needed for substantially more accurate charge estimation.
+The percentage curve is generic; no measured discharge curve for this KBT
+cell is included. [TI's SOC estimation note](https://www.ti.com/lit/an/sluaaa1/sluaaa1.pdf)
+explains the need to characterize voltage under the application's load.
 
-## Live hardware observations
+## Serial commands
 
-COM12 was confirmed as the camera using Arduino CLI's interactive serial
-monitor. The first .NET serial-open attempt failed, and a no-reset esptool
-connection received no bootloader response; the interactive UART monitor did
-succeed. The existing firmware reported approximately 4197-4201 mV with USB
-connected, a displayed 99%, and a transition to "charging" on a 3 mV trend.
-That directly demonstrates the old heuristic's sensitivity to tiny changes.
-It does not establish the battery's actual charge or its battery-only voltage.
+Connect **USB UART** at **115200 baud**. Native USB pins GPIO19/20 are already
+used by the controls and battery circuitry.
 
-A read-only esptool identification confirmed ESP32-S3 revision v0.2, 16 MB
-quad flash, and 8 MB embedded PSRAM, matching the repository's flash/OPI-PSRAM
-settings. It also returned the device to its existing firmware. The SD card
-mounted as SDHC, with about 29808 MiB of filesystem space and 1 MiB used.
+| Command | Action |
+| --- | --- |
+| `storage` | Exact SD used/free/total bytes, photo count/size, onboard flash and firmware size |
+| `battery status` | Show whether test recording is armed |
+| `battery start` | Reset `/battery-test.csv` and arm recording across power cycles |
+| `battery mark <note>` | Add a phase note while recording |
+| `battery stop` | Disarm recording and keep the CSV |
+| `battery dump` | Print the CSV between `BATTERY_LOG_BEGIN` / `BATTERY_LOG_END` |
 
-The replacement firmware was uploaded to COM12 on October 17, 2026 using
-Arduino CLI, with all written regions verified by esptool. Post-upload UART
-logs confirmed successful SDHC mounting and live ADC readings around
-2995-2997 mV, corresponding to approximately 4.19 V and an estimated 99% while
-USB-powered. No crash/reboot loop appeared during the startup observation.
+### Recording an unplugged test
 
-Before uploading, the existing flash region 0x000000-0x20FFFF (bootloader,
-partition table, NVS/boot data, and first 2 MiB application slot) was backed up
-to `%LOCALAPPDATA%/Digital-Camera/firmware-backups/`. The upload wrote only
-onboard boot/partition/application regions; it did not write SD photo files.
+1. Send `storage`, then `battery start` and `battery mark USB baseline`.
+   Leave Home open for 30 seconds.
+2. Send `battery mark unplug next`. Unplug USB, turn on battery power if
+   needed, and leave Home open for one minute.
+3. Open SHOOT and leave the viewfinder running for one minute.
+4. Reconnect USB UART, send `battery mark USB reconnected`, and wait 30 seconds.
+5. Send `battery stop`, then `battery dump` to export the results.
 
-A later battery-only voltage test was completed and exported. See the
-[October 17 hardware test report](battery-test-2026-10-17/report.md). It confirmed
-stable battery-only readings near 3.76 V and a substantial power-dependent
-change in the reported voltage. Multimeter, current and capacity measurements
-remain outstanding; percentages are not calibrated state-of-charge results.
+The CSV records voltage, estimate, validity, screen, boot ID and uptime every
+five seconds. Each record closes the file. Recording resumes after reboot via
+`/battery-test.enabled` and stops at 20 minutes per boot or 32 KiB.
+Starting a new test replaces only the diagnostic log; photos stay in `/picture/`.
 
-## Recording an unplugged test
+SD usage includes logs and allocated FAT clusters. K/M/G use decimal units,
+so filesystem usage can exceed the sum of photo file lengths.
 
-The firmware now accepts serial commands at 115200 and can record to the SD
-card while its USB connection is unplugged. It records measured ADC voltage,
-the divider-derived cell voltage, filtered voltage, estimated percent, reading
-validity, current screen and a boot ID/uptime. It does not infer USB or charge
-status. Notes identify phases according to the physical test procedure.
+## Calibration
 
-1. Connect the USB UART port and send `storage`. It reports exact SD usable,
-   used and free bytes; number/size of images in `/picture`; and onboard flash
-   and firmware size. SD space and onboard flash are separate measurements.
-2. Send `battery start` to create `/battery-test.csv` and arm resume using
-   `/battery-test.enabled`. This resets the previous diagnostic log only.
-3. Send `battery mark USB baseline`, and leave the camera at Home for 30 seconds.
-4. Send `battery mark unplug next`, then unplug USB, turn the camera on using
-   its battery power button if necessary, and leave Home open for one minute.
-5. Open SHOOT and leave the live viewfinder running for one minute. This gives
-   a camera-load measurement, separate from idle/Home load.
-6. Reconnect USB UART. Send `battery mark USB reconnected`, wait 30 seconds,
-   then send `battery stop` followed by `battery dump`. Boot IDs distinguish
-   a battery-only boot from reconnect/reboot. The log persists across both.
+1. Compare serial `ADC=`, `cell=` and `filtered=` with multimeter readings at
+   the battery connector and 3V3/GND, both on USB and under battery-only load.
+   Use the SD recorder for the unplugged phase; reconnecting USB changes it.
+2. Set `BATTERY_REFERENCE_MV` in [`battery_math.h`](../mainCamera/battery_math.h)
+   to the measured 3V3 rail. Only adjust gain/offset after measuring two points.
+3. For uncorrected voltages `x1,x2` and multimeter values `y1,y2`, use:
 
-Logs append every five seconds and close the file after each record. Recording
-stops after 20 minutes within one boot or a 32 KiB log limit. It can be stopped
-earlier explicitly. Test files live outside `/picture` and are not photo files.
-The SD usage indicator includes these diagnostic files as part of used space.
-K/M/G are decimal KB/MB/GB, so roughly 1 MiB used is displayed as about 1.0M
-rather than 0.0 GB. Photo logical bytes can differ from filesystem used bytes
-because FAT allocates whole clusters and other files also consume space.
+   ```text
+   BATTERY_GAIN_PPM = round(1000000 × (y2 − y1) / (x2 − x1))
+   BATTERY_OFFSET_MV = round(y1 − x1 × BATTERY_GAIN_PPM / 1000000)
+   ```
 
-User observation after the first UI firmware: approximately 75% with USB
-connected and 39% after unplugging/powering on. The current generic curve maps
-those estimates to roughly 3.95 V and 3.75 V; those are inferred ranges, not
-new physical measurements. A subsequent direct USB UART observation read about
-3.99 V and 79%. Battery-only raw measurements are now in the [completed test report](battery-test-2026-10-17/report.md).
+4. Rebuild and verify both points. Characterize discharge under camera load
+   before changing the percentage curve. Do not fit it to old screen percentages.
 
-## Completed hardware test
-
-The diagnostic build was flashed and hash-verified. The SD log survived battery
-power-on and was exported after reconnection; logging was explicitly stopped.
-[Results, phase statistics and raw CSV](battery-test-2026-10-17/report.md) document
-about 4.17 V on the first USB baseline, 3.76 V at battery/Home, 3.75 V with the
-viewfinder running, and 3.99 V after USB reconnection. Photos remained at
-25 files / 1,621,800 logical bytes. SD usage was about 1.70 MB before logging;
-the prior zero-GB display was a rounding issue and is fixed with K/M/G units.
+A current-aware fuel gauge would provide a better basis for remaining charge
+across charging and discharge. Current, capacity and multimeter calibration
+remain unmeasured in the published test.

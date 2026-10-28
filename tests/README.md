@@ -1,5 +1,9 @@
 # Firmware and UI checks
 
+[← Project](../README.md) · [Documentation](../docs/README.md)
+
+![Rendered camera UI with synthetic test photos](../docs/images/ui-preview.png)
+
 ## Native LVGL check
 
 Requirements: Zig 0.14.1 (native C/C++ compiler), Python with Pillow, and the
@@ -28,9 +32,9 @@ concurrency.
 - Check old/new camera BMPs and baseline JPEGs for correct orientation/color.
   Unsupported/progressive JPEGs should show an error.
 - Check missing, empty, full and unreadable cards. No automatic formatting.
-  SD usage is used/total decimal GB and refreshes after saving.
+  SD usage uses decimal K/M/G units and refreshes after saving.
 - Compare logged voltages with multimeter readings in both power states before
-  trusting charge estimates. Follow `docs/battery.md`.
+  trusting charge estimates. Follow the [battery guide](../docs/battery.md).
 
 The native harness also checks adaptive K/M/G storage formatting (including a
 single nonzero byte), separate SD/photo/ESP storage reports, battery-log start,
