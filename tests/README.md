@@ -2,7 +2,7 @@
 
 [← Project](../README.md) · [Documentation](../docs/README.md)
 
-![Rendered camera UI with synthetic test photos](../docs/images/ui-preview.png)
+<picture><img src="../docs/images/ui-preview.png" alt="Rendered camera UI with synthetic test photos"></picture>
 
 ## Native LVGL check
 

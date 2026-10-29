@@ -10,12 +10,12 @@ An ESP32-S3 digital camera with a live viewfinder, photo gallery and 3D-printed 
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/images/home.png" alt="Home screen with SHOOT and PLAYBACK" width="440"><br><strong>Home</strong></td>
-    <td width="50%"><img src="docs/images/viewfinder.png" alt="Live viewfinder with framing guides" width="440"><br><strong>Shooting</strong></td>
+    <td width="50%"><picture><img src="docs/images/home.png" alt="Home screen with SHOOT and PLAYBACK" width="440"></picture><br><strong>Home</strong></td>
+    <td width="50%"><picture><img src="docs/images/viewfinder.png" alt="Live viewfinder with framing guides" width="440"></picture><br><strong>Shooting</strong></td>
   </tr>
   <tr>
-    <td><img src="docs/images/playback.png" alt="Single-photo playback with Grid and Home controls" width="440"><br><strong>Photo playback</strong></td>
-    <td><img src="docs/images/enclosure.png" alt="Assembled camera in its printed enclosure" width="440"><br><strong>Printed enclosure</strong></td>
+    <td><picture><img src="docs/images/playback.png" alt="Single-photo playback with Grid and Home controls" width="440"></picture><br><strong>Photo playback</strong></td>
+    <td><picture><img src="docs/images/enclosure.png" alt="Assembled camera in its printed enclosure" width="440"></picture><br><strong>Printed enclosure</strong></td>
   </tr>
 </table>
 

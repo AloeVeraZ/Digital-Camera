@@ -27,7 +27,7 @@ Use STEP in most CAD programs or F3Z for the Fusion 360 project.
 
 ## V1 and V2
 
-![Screenless V1 on the left and V2 with a screen on the right](images/aloez-mini-mini-v1-v2.png)
+<picture><img src="images/aloez-mini-mini-v1-v2.png" alt="Screenless V1 on the left and V2 with a screen on the right"></picture>
 
 V1 used a Seeed Studio XIAO ESP32S3 Sense with a Wi-Fi photo download page.
 V2 uses the Freenove Media Kit with a display, physical controls, battery and gallery.
